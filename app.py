@@ -1402,7 +1402,9 @@ elif page == "📦 Items Master":
 # PAGE: EXPORT TO EXCEL
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "⬇️ Export to Excel":
-    st.markdown('<div class="main-header"><h1>⬇️ Export to Excel</h1><p>Generate your monthly inventory file · Carry over to next month</p></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>⬇️ Export to Excel</h1><p>Generate inventory report for any date range</p></div>', unsafe_allow_html=True)
+
+    import calendar
 
     items_df = load_items(SPREADSHEET_ID)
     log_df   = load_log(SPREADSHEET_ID)
@@ -1410,93 +1412,100 @@ elif page == "⬇️ Export to Excel":
     if items_df.empty:
         st.warning("No items yet. Go to Setup first."); st.stop()
 
-    if not log_df.empty and "MONTH" in log_df.columns:
-        months = sorted(log_df["MONTH"].dropna().unique().tolist(), reverse=True)
-    else:
-        months = [date.today().strftime("%b %Y").upper()]
-
-    # ── SECTION 1: Generate Excel ──────────────────────────────────────────
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Generate Monthly Excel File</div>', unsafe_allow_html=True)
-    sel_month = st.selectbox("Select Month", months, key="export_month")
+    st.markdown('<div class="section-title">Select Date Range</div>', unsafe_allow_html=True)
+
+    c1, c2 = st.columns(2)
+    with c1:
+        from_date = st.date_input("📅 From Date", value=date.today().replace(day=1), key="exp_from")
+    with c2:
+        to_date = st.date_input("📅 To Date", value=date.today(), key="exp_to")
+
+    if from_date > to_date:
+        st.error("From date must be before To date.")
+        st.stop()
+
+    # Show how many days and transactions in range
+    from_str = from_date.strftime("%Y-%m-%d")
+    to_str   = to_date.strftime("%Y-%m-%d")
+
+    if not log_df.empty and "DATE" in log_df.columns:
+        range_log = log_df[(log_df["DATE"] >= from_str) & (log_df["DATE"] <= to_str)]
+        st.markdown(f'<div class="info-box">📊 <strong>{len(range_log)}</strong> transactions found between <strong>{from_date.strftime("%b %d, %Y")}</strong> and <strong>{to_date.strftime("%b %d, %Y")}</strong></div>', unsafe_allow_html=True)
+    else:
+        range_log = pd.DataFrame()
+        st.markdown('<div class="info-box">No transactions found in this range.</div>', unsafe_allow_html=True)
 
     if st.button("📥 Generate Excel File", type="primary", use_container_width=True):
-        import calendar
 
-        month_log = log_df[log_df["MONTH"] == sel_month] if not log_df.empty else pd.DataFrame()
-        # Keep items in original order — new items appended at bottom
+        # Build list of all days in range
+        from datetime import timedelta
+        all_days = []
+        cur = from_date
+        while cur <= to_date:
+            all_days.append(cur.strftime("%Y-%m-%d"))
+            cur += timedelta(days=1)
+
+        # File label
+        if from_date.month == to_date.month and from_date.year == to_date.year:
+            file_label = from_date.strftime("%B_%Y")
+            title_label = from_date.strftime("%B %Y").upper()
+        else:
+            file_label = f"{from_date.strftime('%b_%Y')}_to_{to_date.strftime('%b_%Y')}"
+            title_label = f"{from_date.strftime('%b %d').upper()} TO {to_date.strftime('%b %d, %Y').upper()}"
+
         active = items_df[items_df["ACTIVE"] == "YES"].copy().reset_index(drop=True)
-
-        # Parse month to get year/month number for building all 31 days
-        try:
-            month_dt = datetime.strptime(sel_month, "%b %Y")
-            yr, mo = month_dt.year, month_dt.month
-            days_in_month = calendar.monthrange(yr, mo)[1]
-            all_days = [f"{yr}-{mo:02d}-{d:02d}" for d in range(1, days_in_month + 1)]
-        except:
-            all_days = []
 
         wb = openpyxl.Workbook()
 
         # ── Styles ──────────────────────────────────────────────────────────
-        dark_green  = "1A2E1A"
-        mid_green   = "0A1208"
-        hdr_fill    = PatternFill("solid", fgColor=dark_green)
-        title_fill  = PatternFill("solid", fgColor=mid_green)
-        hdr_font    = Font(bold=True, color="A8C896", size=9)
-        title_font  = Font(bold=True, color="C8DCC0", size=12)
-        worth_font  = Font(bold=True, color="8CAF7A", size=9)
-        worth_fill  = PatternFill("solid", fgColor="0E1C0E")
-        thin        = Side(style="thin", color="2A3828")
-        border      = Border(left=thin, right=thin, top=thin, bottom=thin)
-        num_fmt     = "#,##0.00"
-        num_fmt4    = "#,##0.0000"
+        hdr_fill   = PatternFill("solid", fgColor="1A2E1A")
+        title_fill = PatternFill("solid", fgColor="0A1208")
+        worth_fill = PatternFill("solid", fgColor="0E1C0E")
+        hdr_font   = Font(bold=True, color="A8C896", size=9)
+        title_font = Font(bold=True, color="C8DCC0", size=12)
+        worth_font = Font(bold=True, color="8CAF7A", size=9)
+        thin       = Side(style="thin", color="2A3828")
+        border     = Border(left=thin, right=thin, top=thin, bottom=thin)
+        num_fmt4   = "#,##0.0000"
 
         cat_colors = {
-            "beverage": "D6E8F5", "beef": "F5D6D6", "chicken": "FFF3D6",
-            "seafood":  "D6F0F5", "fresh": "D6F5E0", "dry":     "FFF8D6",
-            "wet":      "EDD6F5", "rtc":  "D6E8FF", "pork":    "F5D6D6",
-            "meat":     "F0F0F0", "frozen":"D6EAF8", "dessert": "FFF0D6"
+            "beverage":"D6E8F5","beef":"F5D6D6","chicken":"FFF3D6",
+            "seafood":"D6F0F5","fresh":"D6F5E0","dry":"FFF8D6",
+            "wet":"EDD6F5","rtc":"D6E8FF","pork":"F5D6D6",
+            "meat":"F0F0F0","frozen":"D6EAF8","dessert":"FFF0D6"
         }
 
-        MAIN_COLS  = ["ITEM", "BEGINNING STOCKS", "UNIT COST", "UNIT OF MEASURE", "CATEGORY",
-                      "ADD'L / IN", "OVER", "RESTAURANT", "BANQUET", "CAFÉ", "BAR", "OTHERS",
-                      "SPOILAGE", "ENDING STOCKS", "TOTAL WORTH OF STOCKS"]
-        WORTH_COLS = ["WORTH OF BEGINNING", "WORTH OF ADD'L/IN", "WORTH OF OVER",
-                      "WORTH OF RESTAURANT", "WORTH OF BANQUET", "WORTH OF CAFÉ",
-                      "WORTH OF BAR", "WORTH OF OTHERS", "WORTH OF SPOILAGE", "WORTH OF ENDING"]
+        MAIN_COLS  = ["ITEM","BEGINNING STOCKS","UNIT COST","UNIT OF MEASURE","CATEGORY",
+                      "ADD'L / IN","OVER","RESTAURANT","BANQUET","CAFÉ","BAR","OTHERS",
+                      "SPOILAGE","ENDING STOCKS","TOTAL WORTH OF STOCKS"]
+        WORTH_COLS = ["WORTH OF BEGINNING","WORTH OF ADD'L/IN","WORTH OF OVER",
+                      "WORTH OF RESTAURANT","WORTH OF BANQUET","WORTH OF CAFÉ",
+                      "WORTH OF BAR","WORTH OF OTHERS","WORTH OF SPOILAGE","WORTH OF ENDING"]
 
         def col_letter(n): return get_column_letter(n)
 
-        # Build cumulative stock tracker — running ending per item across days
-        # So each day's BEGINNING = previous day's ENDING
+        # Running stock tracker — beginning of range = current BEGINNING_STOCKS
         item_running = {row["ITEM"]: num(row["BEGINNING_STOCKS"]) for _, row in active.iterrows()}
 
         def write_day_sheet(ws_out, day_str, day_label, tab_log, item_running):
-
-            # Title row
             ws_out.merge_cells("A1:O1")
             tc = ws_out["A1"]
-            tc.value = f"{sel_month} — {day_label} — SERVANDO MAIN WAREHOUSE INVENTORY"
-            tc.font = title_font
-            tc.fill = title_fill
+            tc.value = f"{day_label} — SERVANDO MAIN WAREHOUSE INVENTORY"
+            tc.font = title_font; tc.fill = title_fill
             tc.alignment = Alignment(horizontal="center", vertical="center")
             ws_out.row_dimensions[1].height = 26
 
-            # Spacer + SUMMARY label
             ws_out.merge_cells("Q2:Z2")
             ws_out["Q2"].value = "SUMMARY (WORTH)"
-            ws_out["Q2"].font = worth_font
-            ws_out["Q2"].fill = worth_fill
+            ws_out["Q2"].font = worth_font; ws_out["Q2"].fill = worth_fill
             ws_out["Q2"].alignment = Alignment(horizontal="center", vertical="center")
 
-            # Header row
             for ci, col in enumerate(MAIN_COLS, 1):
                 c = ws_out.cell(row=2, column=ci, value=col)
                 c.fill = hdr_fill; c.font = hdr_font
                 c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
                 c.border = border
-            # Worth headers (col Q onwards = 17)
             for ci, col in enumerate(WORTH_COLS, 17):
                 c = ws_out.cell(row=2, column=ci, value=col)
                 c.fill = worth_fill; c.font = worth_font
@@ -1504,7 +1513,6 @@ elif page == "⬇️ Export to Excel":
                 c.border = border
             ws_out.row_dimensions[2].height = 38
 
-            # Data rows
             for ri, (_, item) in enumerate(active.iterrows(), 3):
                 name = item["ITEM"]
                 cost = num(item["UNIT COST"])
@@ -1532,7 +1540,6 @@ elif page == "⬇️ Export to Excel":
                              item["CATEGORY"], round(add_in,4), round(over,4),
                              round(rest,4), round(banq,4), round(cafe,4), round(bar,4),
                              round(others,4), round(spoil,4), round(ending,4), round(worth,4)]
-
                 worth_vals = [beg*cost, add_in*cost, over*cost, rest*cost, banq*cost,
                               cafe*cost, bar*cost, others*cost, spoil*cost, worth]
 
@@ -1547,10 +1554,9 @@ elif page == "⬇️ Export to Excel":
 
                 for ci, val in enumerate(worth_vals, 17):
                     cell = ws_out.cell(row=ri, column=ci, value=round(val,4))
-                    cell.fill = PatternFill("solid", fgColor="0E1C0E")
+                    cell.fill = worth_fill
                     cell.font = Font(color="8CAF7A", size=9)
-                    cell.number_format = num_fmt4
-                    cell.border = border
+                    cell.number_format = num_fmt4; cell.border = border
                     cell.alignment = Alignment(horizontal="right", vertical="center")
 
             # Totals row
@@ -1558,39 +1564,30 @@ elif page == "⬇️ Export to Excel":
             ws_out.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
             ws_out.cell(row=total_row, column=1).fill = hdr_fill
             ws_out.cell(row=total_row, column=1).border = border
-
             for ci in [2,6,7,8,9,10,11,12,13,14,15]:
                 col_l = col_letter(ci)
                 cell = ws_out.cell(row=total_row, column=ci,
                     value=f"=SUM({col_l}3:{col_l}{total_row-1})")
-                cell.fill = hdr_fill
-                cell.font = Font(bold=True, color="A8C896", size=9)
-                cell.number_format = num_fmt4
-                cell.border = border
+                cell.fill = hdr_fill; cell.font = Font(bold=True, color="A8C896", size=9)
+                cell.number_format = num_fmt4; cell.border = border
                 cell.alignment = Alignment(horizontal="right")
-
             for ci in range(17, 17+len(WORTH_COLS)):
                 col_l = col_letter(ci)
                 cell = ws_out.cell(row=total_row, column=ci,
                     value=f"=SUM({col_l}3:{col_l}{total_row-1})")
-                cell.fill = worth_fill
-                cell.font = Font(bold=True, color="8CAF7A", size=9)
-                cell.number_format = num_fmt4
-                cell.border = border
+                cell.fill = worth_fill; cell.font = Font(bold=True, color="8CAF7A", size=9)
+                cell.number_format = num_fmt4; cell.border = border
                 cell.alignment = Alignment(horizontal="right")
 
-            # Column widths
             col_widths = [32,13,11,14,11,11,10,12,12,10,10,10,12,14,17,3,
                           14,13,12,14,14,12,12,12,14,14]
             for ci, w in enumerate(col_widths, 1):
                 ws_out.column_dimensions[col_letter(ci)].width = w
-
             ws_out.freeze_panes = "A3"
 
-            # Update running stock for next day
+            # Update running stock
             for _, item in active.iterrows():
                 name = item["ITEM"]
-                cost = num(item["UNIT COST"])
                 beg  = item_running.get(name, 0.0)
                 if not tab_log.empty:
                     ilog   = tab_log[tab_log["ITEM"] == name]
@@ -1607,25 +1604,25 @@ elif page == "⬇️ Export to Excel":
                 item_running[name] = beg + add_in + over - rest - banq - cafe - bar - others - spoil
             return item_running
 
-        # ── Write all 31 days ──────────────────────────────────────────────
+        # ── Write one tab per day ────────────────────────────────────────
         for day_str in all_days:
             try:
                 d = datetime.strptime(day_str, "%Y-%m-%d")
-                tab_name  = str(d.day)   # "1", "2" ... "31"
+                tab_name  = str(d.day)
                 day_label = d.strftime("%B %d, %Y").upper()
             except:
                 tab_name  = day_str[-2:].lstrip("0") or "1"
                 day_label = day_str
 
-            tab_log = month_log[month_log["DATE"] == day_str] if not month_log.empty else pd.DataFrame()
+            tab_log = range_log[range_log["DATE"] == day_str] if not range_log.empty else pd.DataFrame()
             ws_day  = wb.create_sheet(title=tab_name)
             item_running = write_day_sheet(ws_day, day_str, day_label, tab_log, item_running)
 
-        # ── SUMMARY sheet ──────────────────────────────────────────────────
+        # ── SUMMARY tab ──────────────────────────────────────────────────
         ws_sum = wb.create_sheet(title="SUMMARY")
         ws_sum.merge_cells("A1:O1")
         tc = ws_sum["A1"]
-        tc.value = f"MONTH END — {sel_month} — SERVANDO MAIN WAREHOUSE INVENTORY"
+        tc.value = f"SUMMARY — {title_label} — SERVANDO MAIN WAREHOUSE INVENTORY"
         tc.font = title_font; tc.fill = title_fill
         tc.alignment = Alignment(horizontal="center", vertical="center")
         ws_sum.row_dimensions[1].height = 26
@@ -1647,16 +1644,14 @@ elif page == "⬇️ Export to Excel":
             c.border = border
         ws_sum.row_dimensions[2].height = 38
 
-        # Summary uses full month log and original beginning stocks
-        sum_running = {row["ITEM"]: num(row["BEGINNING_STOCKS"]) for _, row in active.iterrows()}
         for ri, (_, item) in enumerate(active.iterrows(), 3):
             name = item["ITEM"]
             cost = num(item["UNIT COST"])
             cat  = str(item["CATEGORY"]).lower()
             beg  = num(item["BEGINNING_STOCKS"])
 
-            if not month_log.empty:
-                ilog   = month_log[month_log["ITEM"] == name]
+            if not range_log.empty:
+                ilog   = range_log[range_log["ITEM"] == name]
                 add_in = ilog["ADD_IN"].apply(num).sum()
                 over   = ilog["OVER"].apply(num).sum()
                 rest   = ilog["RESTAURANT"].apply(num).sum()
@@ -1689,7 +1684,7 @@ elif page == "⬇️ Export to Excel":
                     cell.alignment = Alignment(vertical="center")
             for ci, val in enumerate(worth_vals, 17):
                 cell = ws_sum.cell(row=ri, column=ci, value=round(val,4))
-                cell.fill = PatternFill("solid", fgColor="0E1C0E")
+                cell.fill = worth_fill
                 cell.font = Font(color="8CAF7A", size=9)
                 cell.number_format = num_fmt4; cell.border = border
                 cell.alignment = Alignment(horizontal="right", vertical="center")
@@ -1697,6 +1692,7 @@ elif page == "⬇️ Export to Excel":
         total_row = len(active) + 3
         ws_sum.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
         ws_sum.cell(row=total_row, column=1).fill = hdr_fill
+        ws_sum.cell(row=total_row, column=1).border = border
         for ci in [2,6,7,8,9,10,11,12,13,14,15]:
             col_l = col_letter(ci)
             cell = ws_sum.cell(row=total_row, column=ci, value=f"=SUM({col_l}3:{col_l}{total_row-1})")
@@ -1716,89 +1712,20 @@ elif page == "⬇️ Export to Excel":
             ws_sum.column_dimensions[col_letter(ci)].width = w
         ws_sum.freeze_panes = "A3"
 
-        # Remove default sheet
         if "Sheet" in wb.sheetnames:
             del wb["Sheet"]
 
         buf = BytesIO()
         wb.save(buf); buf.seek(0)
 
-        month_str = sel_month.replace(" ", "_")
-        try:
-            mdt = datetime.strptime(sel_month, "%b %Y")
-            file_label = mdt.strftime("%B_%Y")
-        except:
-            file_label = month_str
-
         st.download_button(
-            label=f"📥 Download {sel_month} Inventory.xlsx",
+            label=f"📥 Download {file_label.replace('_', ' ')}.xlsx",
             data=buf,
             file_name=f"{file_label}_-_Servando_Main_Warehouse.xlsx",
             mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
-        st.success(f"✅ Excel ready! {days_in_month} daily tabs + SUMMARY tab. Filename: {file_label} - Servando Main Warehouse.xlsx")
+        st.success(f"✅ Done! {len(all_days)} daily tabs + SUMMARY. File: {file_label} - Servando Main Warehouse.xlsx")
     st.markdown('</div>', unsafe_allow_html=True)
-
-    # ── SECTION 2: Month-End Carryover ────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">📅 Start New Month — Carry Over Ending Stocks</div>', unsafe_allow_html=True)
-    st.write("This takes the **Ending Stocks** from a completed month and sets them as the **Beginning Stocks** for the next month. Your item list order stays the same — new items stay at the bottom.")
-
-    c1, c2 = st.columns(2)
-    with c1:
-        from_month = st.selectbox("From Month (copy ending stocks)", months, key="carryover_from")
-    with c2:
-        next_month_input = st.text_input("New Month (e.g. JUL 2026)", placeholder="MMM YYYY", key="carryover_to")
-
-    if st.button("🔄 Carry Over to New Month", type="primary", use_container_width=True):
-        if not next_month_input.strip():
-            st.error("Please enter the new month name.")
-        else:
-            new_month = next_month_input.strip().upper()
-            # Compute ending stocks for each item from the from_month
-            from_log = log_df[log_df["MONTH"] == from_month] if not log_df.empty else pd.DataFrame()
-            active = items_df[items_df["ACTIVE"] == "YES"].copy().reset_index(drop=True)
-
-            ws_items = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
-            all_records = ws_items.get_all_records()
-
-            updated = 0
-            for idx, item in active.iterrows():
-                name = item["ITEM"]
-                beg  = num(item["BEGINNING_STOCKS"])
-                if not from_log.empty:
-                    ilog   = from_log[from_log["ITEM"] == name]
-                    add_in = ilog["ADD_IN"].apply(num).sum()
-                    over   = ilog["OVER"].apply(num).sum()
-                    rest   = ilog["RESTAURANT"].apply(num).sum()
-                    banq   = ilog["BANQUET"].apply(num).sum()
-                    cafe   = ilog["CAFE"].apply(num).sum()
-                    bar    = ilog["BAR"].apply(num).sum()
-                    others = ilog["OTHERS"].apply(num).sum()
-                    spoil  = ilog["SPOILAGE"].apply(num).sum()
-                else:
-                    add_in=over=rest=banq=cafe=bar=others=spoil=0.0
-                ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
-
-                # Update BEGINNING_STOCKS column (col 5) in the sheet
-                # Row in sheet = index + 2 (header on row 1)
-                sheet_row = idx + 2
-                ws_items.update_cell(sheet_row, 5, round(ending, 4))
-                updated += 1
-
-            # Log a note in the log sheet marking the new month start
-            log_ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
-            ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            log_ws.append_row([ts, date.today().strftime("%Y-%m-%d"), new_month,
-                                "— MONTH START —", "System", "CARRYOVER",
-                                f"CARRY-{from_month}-TO-{new_month}",
-                                0,0,0,0,0,0,0,0,
-                                f"Beginning stocks carried over from {from_month}"])
-
-            invalidate_cache()
-            st.success(f"✅ Done! {updated} items carried over from **{from_month}** → **{new_month}**. Beginning stocks updated. You can now start logging for {new_month}.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: SETUP
 # ══════════════════════════════════════════════════════════════════════════════
