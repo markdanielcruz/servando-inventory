@@ -781,7 +781,7 @@ with st.sidebar:
 
     page = st.radio("", [
         "📊 Dashboard",
-        "📥 Deliveries",
+        "📥 Incoming Deliveries",
         "📋 Purchase Orders",
         "🔧 Stock Adjustment",
         "📆 Monthly Report",
@@ -873,8 +873,8 @@ if page == "📊 Dashboard":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: DELIVERIES
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📥 Deliveries":
-    st.markdown('<div class="main-header"><h1>📥 Deliveries</h1><p>Log incoming stock from suppliers</p></div>', unsafe_allow_html=True)
+elif page == "📥 Incoming Deliveries":
+    st.markdown('<div class="main-header"><h1>📥 Incoming Deliveries</h1><p>Log incoming stock from suppliers</p></div>', unsafe_allow_html=True)
 
     items_df = load_items(SPREADSHEET_ID)
     active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
@@ -897,12 +897,9 @@ elif page == "📥 Deliveries":
     # Add item
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Add Item to Delivery</div>', unsafe_allow_html=True)
-    search = st.text_input("🔍 Search Item", key="del_search")
-    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
     c1, c2 = st.columns([3,1])
-    with c1: sel_item = st.selectbox("Select Item", filtered, key="del_item")
+    with c1: sel_item = st.selectbox("Select Item", active_items, key="del_item")
     with c2: qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="del_qty")
-    notes = st.text_input("Notes (optional)", key="del_notes")
 
     if sel_item:
         info = items_df[items_df["ITEM"]==sel_item].iloc[0]
@@ -911,7 +908,7 @@ elif page == "📥 Deliveries":
     if st.button("➕ Add to Delivery", use_container_width=True):
         if sel_item and qty > 0:
             st.session_state.delivery_cart.append({"item": sel_item, "qty": qty, "notes": notes,
-                                                    "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"])})
+                                                    "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]), "notes": ""})
             st.success(f"✅ {sel_item} added.")
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -994,12 +991,9 @@ elif page == "📋 Purchase Orders":
     # Add item
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Add Item to PO</div>', unsafe_allow_html=True)
-    search = st.text_input("🔍 Search Item", key="po_search")
-    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
     c1, c2 = st.columns([3,1])
-    with c1: po_item = st.selectbox("Select Item", filtered, key="po_item")
+    with c1: po_item = st.selectbox("Select Item", active_items, key="po_item")
     with c2: po_qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
-    po_notes = st.text_input("Notes (optional)", key="po_notes")
 
     if po_item:
         info = items_df[items_df["ITEM"]==po_item].iloc[0]
@@ -1007,7 +1001,7 @@ elif page == "📋 Purchase Orders":
 
     if st.button("➕ Add to PO", use_container_width=True):
         if po_item and po_qty > 0:
-            st.session_state.po_cart.append({"item": po_item, "qty": po_qty, "notes": po_notes,
+            st.session_state.po_cart.append({"item": po_item, "qty": po_qty, "notes": "",
                                               "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]),
                                               "dept": department})
             st.success(f"✅ {po_item} added.")
@@ -1090,10 +1084,8 @@ elif page == "🔧 Stock Adjustment":
 
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Add Adjustment</div>', unsafe_allow_html=True)
-    search = st.text_input("🔍 Search Item", key="adj_search")
-    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
     c1, c2, c3 = st.columns([3,1.5,1])
-    with c1: adj_item = st.selectbox("Select Item", filtered, key="adj_item")
+    with c1: adj_item = st.selectbox("Select Item", active_items, key="adj_item")
     with c2:
         adj_type = st.selectbox("Type", ["Over (Add +)", "Spoilage (Remove −)"], key="adj_type")
     with c3: adj_qty = st.number_input("Qty", min_value=0.01, step=0.01, format="%.2f", key="adj_qty")
@@ -1243,42 +1235,74 @@ elif page == "🔍 Item History":
     tab1, tab2 = st.tabs(["🔍 Search by Item", "🧾 Search by Reference (PO / Delivery / Adjustment)"])
 
     with tab1:
-        search = st.text_input("Search Item", placeholder="Type item name...")
-        if search and not items_df.empty:
-            found = items_df[items_df["ITEM"].str.contains(search, case=False, na=False)]["ITEM"].tolist()
-            if not found:
-                st.warning("No items found.")
-            else:
-                sel = st.selectbox("Select Item", found)
-                if sel and not log_df.empty:
-                    ilog = log_df[log_df["ITEM"]==sel].sort_values("TIMESTAMP", ascending=False)
+        if items_df.empty:
+            st.info("No items yet.")
+        else:
+            search = st.text_input("Search Item", placeholder="Type item name...")
+            active_names = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist()
+            filtered_names = [i for i in active_names if search.lower() in i.lower()] if search else active_names
+            sel = st.selectbox("Select Item", filtered_names, key="hist_item")
+
+            if sel:
+                info = items_df[items_df["ITEM"]==sel].iloc[0]
+                st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()} &nbsp;|&nbsp; Current Beginning: <strong>{num(info["BEGINNING_STOCKS"]):,.2f}</strong></div>', unsafe_allow_html=True)
+
+                if log_df.empty:
+                    st.info("No transactions yet.")
+                else:
+                    ilog = log_df[log_df["ITEM"]==sel].copy()
                     if ilog.empty:
-                        st.info("No transactions yet for this item.")
+                        st.info("No transactions recorded for this item yet.")
                     else:
-                        info = items_df[items_df["ITEM"]==sel].iloc[0]
-                        st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f} &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+                        # Summary metrics
+                        total_in    = ilog["ADD_IN"].apply(num).sum()
+                        total_over  = ilog["OVER"].apply(num).sum()
+                        total_out   = (ilog["RESTAURANT"].apply(num) + ilog["BANQUET"].apply(num) +
+                                       ilog["CAFE"].apply(num) + ilog["BAR"].apply(num) +
+                                       ilog["OTHERS"].apply(num)).sum()
+                        total_spoil = ilog["SPOILAGE"].apply(num).sum()
 
                         c1,c2,c3,c4 = st.columns(4)
-                        with c1: st.metric("Total Add'l/In", f'{ilog["ADD_IN"].apply(num).sum():,.2f}')
-                        with c2: st.metric("Total PO Out", f'{(ilog["RESTAURANT"].apply(num)+ilog["BANQUET"].apply(num)+ilog["CAFE"].apply(num)+ilog["BAR"].apply(num)+ilog["OTHERS"].apply(num)).sum():,.2f}')
-                        with c3: st.metric("Total Spoilage", f'{ilog["SPOILAGE"].apply(num).sum():,.2f}')
-                        with c4: st.metric("Transactions", len(ilog))
+                        with c1: st.metric("Total Incoming", f"{total_in:,.2f}")
+                        with c2: st.metric("Total Released (PO)", f"{total_out:,.2f}")
+                        with c3: st.metric("Total Spoilage", f"{total_spoil:,.2f}")
+                        with c4: st.metric("Total Transactions", len(ilog))
 
-                        for _, row in ilog.iterrows():
-                            txn = row.get("TXN_TYPE","")
-                            ref = row.get("REF_NUMBER","")
-                            parts = []
-                            for col, label in [("ADD_IN","Add'l/In"),("OVER","Over"),
-                                               ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
-                                               ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
-                                v = num(row.get(col,0))
-                                if v: parts.append(f"{label}: <strong>{v:,.2f}</strong>")
-                            st.markdown(f"""<div class="log-entry">
-                                <strong>{txn}</strong> {f'<span style="color:#5A7A52;">({ref})</span>' if ref else ''} &nbsp;·&nbsp;
-                                👤 {row.get('STAFF','')} &nbsp;·&nbsp; 📅 {row.get('DATE','')}
-                                <div style="margin-top:4px;">{' &nbsp;·&nbsp; '.join(parts) if parts else '—'}</div>
-                                {f'<div style="color:#5A7A52;font-size:0.8rem;">📝 {row.get("NOTES","")}</div>' if row.get("NOTES") else ''}
-                            </div>""", unsafe_allow_html=True)
+                        st.markdown("---")
+
+                        # Group by transaction type
+                        for txn_type, icon, color in [
+                            ("DELIVERY",   "📥", "#4A8ACC"),
+                            ("PO",         "📋", "#8CAF7A"),
+                            ("ADJUSTMENT", "🔧", "#C4A840"),
+                            ("CARRYOVER",  "🔄", "#AA6ACC"),
+                        ]:
+                            tlog = ilog[ilog["TXN_TYPE"]==txn_type].sort_values("TIMESTAMP", ascending=False)
+                            if tlog.empty:
+                                continue
+
+                            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:{color};margin:12px 0 6px 0;padding-bottom:4px;border-bottom:1px solid #1E2E1C;">{icon} {txn_type} — {len(tlog)} record(s)</div>', unsafe_allow_html=True)
+
+                            for _, row in tlog.iterrows():
+                                ref  = row.get("REF_NUMBER","")
+                                date_str = row.get("DATE","")
+                                staff = row.get("STAFF","")
+                                parts = []
+                                for col, label in [("ADD_IN","Incoming"),("OVER","Over (Adjustment)"),
+                                                   ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
+                                                   ("CAFE","Café"),("BAR","Bar"),
+                                                   ("OTHERS","Others"),("SPOILAGE","Spoilage")]:
+                                    v = num(row.get(col,0))
+                                    if v: parts.append(f"<strong style='color:{color};'>{label}:</strong> {v:,.2f}")
+                                notes_str = f'<div style="color:#5A7A52;font-size:0.78rem;margin-top:3px;">📝 {row.get("NOTES","")}</div>' if row.get("NOTES") else ""
+                                st.markdown(f"""<div class="log-entry" style="border-left-color:{color};">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;">
+                                        <span>📅 <strong>{date_str}</strong> &nbsp;·&nbsp; 👤 {staff}</span>
+                                        <span style="color:#3A5238;font-size:0.75rem;">{ref}</span>
+                                    </div>
+                                    <div style="margin-top:5px;">{' &nbsp;&nbsp; '.join(parts) if parts else '—'}</div>
+                                    {notes_str}
+                                </div>""", unsafe_allow_html=True)
 
     with tab2:
         ref_search = st.text_input("Search Reference #", placeholder="e.g. PO-20260628, DEL-..., ADJ-...")
@@ -1293,7 +1317,7 @@ elif page == "🔍 Item History":
                     st.markdown(f'<div class="info-box">🧾 <strong>{ref}</strong> &nbsp;|&nbsp; {first.get("TXN_TYPE","")} &nbsp;|&nbsp; 📅 {first.get("DATE","")} &nbsp;|&nbsp; 👤 {first.get("STAFF","")} &nbsp;|&nbsp; {len(rr)} item(s)</div>', unsafe_allow_html=True)
                     for _, row in rr.iterrows():
                         parts = []
-                        for col, label in [("ADD_IN","Add'l/In"),("OVER","Over"),
+                        for col, label in [("ADD_IN","Incoming"),("OVER","Over"),
                                            ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
                                            ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
                             v = num(row.get(col,0))
@@ -1301,7 +1325,6 @@ elif page == "🔍 Item History":
                         st.markdown(f"""<div class="log-entry">
                             📦 <strong>{row.get('ITEM','')}</strong>
                             <div style="margin-top:3px;">{' &nbsp;·&nbsp; '.join(parts) if parts else '—'}</div>
-                            {f'<div style="color:#5A7A52;font-size:0.8rem;">📝 {row.get("NOTES","")}</div>' if row.get("NOTES") else ''}
                         </div>""", unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
