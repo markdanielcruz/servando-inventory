@@ -111,6 +111,15 @@ section[data-testid="stSidebar"] .stRadio label {
 }
 .log-entry .timestamp { color: #888; font-size: 0.8rem; }
 
+/* PO item row */
+.po-item-row {
+    background: #f8f9ff;
+    border: 1px solid #dde3f0;
+    border-radius: 8px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+}
+
 /* Badge */
 .badge {
     display: inline-block;
@@ -183,13 +192,16 @@ MASTER_SHEET    = "MASTER LIST"
 LOG_SHEET       = "DAILY LOG"
 
 MASTER_HEADERS  = ["ITEM", "UNIT COST", "UNIT OF MEASURE", "CATEGORY", "ACTIVE"]
-LOG_HEADERS     = ["TIMESTAMP", "MONTH", "DATE", "ITEM", "STAFF",
+LOG_HEADERS     = ["TIMESTAMP", "MONTH", "DATE", "ITEM", "STAFF", "PO NUMBER", "DEPARTMENT",
                    "ADD'L/IN", "OVER", "DAMAGED/OUT", "CAFÉ", "BAR",
                    "KITCHEN ALA CARTE", "KITCHEN BANQUET", "RESTO", "NOTES"]
 SUMMARY_HEADERS = ["ITEM", "UNIT COST", "UNIT OF MEASURE", "CATEGORY",
                    "BEGINNING STOCKS", "ADD'L/IN", "OVER", "DAMAGED/OUT",
                    "CAFÉ", "BAR", "KITCHEN ALA CARTE", "KITCHEN BANQUET",
                    "RESTO", "ENDING STOCKS", "TOTAL WORTH OF STOCKS"]
+
+DEPARTMENTS = ["Restaurant", "Cafe", "Bar", "Banquet", "Warehouse / General", "Others"]
+FIELD_TYPES = ["Add'l / In", "Over", "Damaged / Out", "Café", "Bar", "Kitchen Ala Carte", "Kitchen Banquet", "Resto"]
 
 # ── Data helpers ───────────────────────────────────────────────────────────────
 def load_master(spreadsheet):
@@ -214,6 +226,43 @@ def month_label(y, m):
 def current_month_label():
     n = datetime.now()
     return month_label(n.year, n.month)
+
+def generate_po_number(entry_date, department):
+    """Generate a PO number like PO-20260628-CAFE-001"""
+    dept_code = department.upper().replace(" ", "").replace("/", "")[:4]
+    date_str = entry_date.strftime("%Y%m%d")
+    ts = datetime.now().strftime("%H%M%S")
+    return f"PO-{date_str}-{dept_code}-{ts}"
+
+def update_summary_for_item(spreadsheet, entry_date, selected_item, addin, over, damaged, cafe, bar, kitchen, banquet, resto):
+    """Update summary sheet for a single item's quantities."""
+    month_lbl = entry_date.strftime("%b %Y").upper()
+    sum_sheet = f"SUMMARY - {month_lbl}"
+    try:
+        sum_ws = spreadsheet.worksheet(sum_sheet)
+        records = sum_ws.get_all_records()
+        for idx, rec in enumerate(records):
+            if rec["ITEM"] == selected_item:
+                row_num = idx + 2
+                cols = ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR",
+                        "KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]
+                vals  = [addin, over, damaged, cafe, bar, kitchen, banquet, resto]
+                for col, val in zip(cols, vals):
+                    if val:
+                        cur = float(rec.get(col, 0) or 0)
+                        col_idx = SUMMARY_HEADERS.index(col) + 1
+                        sum_ws.update_cell(row_num, col_idx, cur + val)
+
+                # Recalculate ending & worth
+                updated = sum_ws.row_values(row_num)
+                def gv(i): return float(updated[i-1]) if updated[i-1] else 0
+                ending = gv(5)+gv(6)+gv(7)-gv(8)-gv(9)-gv(10)-gv(11)-gv(12)-gv(13)
+                cost_v = gv(2)
+                sum_ws.update_cell(row_num, 14, round(ending, 4))
+                sum_ws.update_cell(row_num, 15, round(ending * cost_v, 4))
+                break
+    except Exception:
+        pass
 
 def recompute_summary(spreadsheet, month_lbl, master_df, log_df):
     """Recompute summary for a month from the log and write it back."""
@@ -244,7 +293,6 @@ def recompute_summary(spreadsheet, month_lbl, master_df, log_df):
         banquet  = col_sum("KITCHEN BANQUET")
         resto    = col_sum("RESTO")
 
-        # Get beginning stocks from summary sheet meta row (stored separately)
         begin_key = f"BEGIN_{month_lbl}_{name}"
         beginning = st.session_state.get(begin_key, 0)
 
@@ -276,7 +324,7 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     page = st.radio("Navigation", [
-        "📋 Daily Input",
+        "📋 Purchase Order",
         "📦 Ingredients",
         "📅 Month Manager",
         "🔍 Search & History",
@@ -353,10 +401,10 @@ if page == "⚙️ Setup":
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: DAILY INPUT
+# PAGE: PURCHASE ORDER
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📋 Daily Input":
-    st.markdown('<div class="main-header"><div><h1>📋 Daily Input</h1><p>Record inventory movements for today</p></div></div>', unsafe_allow_html=True)
+elif page == "📋 Purchase Order":
+    st.markdown('<div class="main-header"><div><h1>📋 Purchase Order</h1><p>Build a PO with multiple items, then submit all at once</p></div></div>', unsafe_allow_html=True)
 
     master_df = load_master(spreadsheet)
     if master_df.empty:
@@ -365,105 +413,164 @@ elif page == "📋 Daily Input":
 
     active_items = master_df[master_df["ACTIVE"] == "YES"]["ITEM"].tolist()
 
-    col1, col2, col3 = st.columns([2, 2, 3])
+    # ── Initialize PO cart in session state ──
+    if "po_items" not in st.session_state:
+        st.session_state.po_items = []
+
+    # ── PO Header ──────────────────────────────────────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">PO Details</div>', unsafe_allow_html=True)
+
+    col1, col2, col3 = st.columns(3)
     with col1:
-        entry_date = st.date_input("📅 Date", value=date.today())
+        entry_date = st.date_input("📅 Date", value=date.today(), key="po_date")
     with col2:
-        staff_name = st.text_input("👤 Staff Name", placeholder="Enter your name")
+        staff_name = st.text_input("👤 Staff Name", placeholder="Enter your name", key="po_staff")
     with col3:
-        selected_month = st.text_input("📆 Month (auto-filled)", value=entry_date.strftime("%b %Y").upper(), disabled=True)
+        department_choice = st.selectbox("🏢 Department", DEPARTMENTS, key="po_dept")
 
-    st.markdown("---")
+    if department_choice == "Others":
+        others_text = st.text_input("✏️ Please specify department", placeholder="e.g. Maintenance, Security...", key="po_others")
+        department = others_text.strip() if others_text.strip() else "Others"
+    else:
+        department = department_choice
 
-    search_query = st.text_input("🔍 Search Ingredient", placeholder="Type to search... e.g. 'chicken', 'beef'")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Add Item to PO ─────────────────────────────────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Add Item to PO</div>', unsafe_allow_html=True)
+
+    search_query = st.text_input("🔍 Search Ingredient", placeholder="Type to search... e.g. 'chicken', 'beef'", key="po_search")
     filtered = [i for i in active_items if search_query.lower() in i.lower()] if search_query else active_items
 
-    if search_query and not filtered:
-        st.warning("No ingredients found matching your search.")
-    else:
-        if search_query:
-            st.caption(f"Found {len(filtered)} item(s)")
+    col_item, col_field, col_qty = st.columns([3, 2, 1])
+    with col_item:
+        selected_item = st.selectbox("Select Ingredient", filtered, key="po_item_select")
+    with col_field:
+        field_type = st.selectbox("Movement Type", FIELD_TYPES, key="po_field_type")
+    with col_qty:
+        quantity = st.number_input("Qty", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
 
-        selected_item = st.selectbox("Select Ingredient", filtered)
+    item_notes = st.text_input("📝 Item Notes (optional)", key="po_item_notes")
 
-        if selected_item:
-            item_info = master_df[master_df["ITEM"] == selected_item].iloc[0]
-            st.markdown(f"""
-            <div class="info-box">
-                📦 <strong>{selected_item}</strong> &nbsp;|&nbsp; 
-                Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
-                Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
-                Category: <strong>{item_info['CATEGORY'].upper()}</strong>
-            </div>
-            """, unsafe_allow_html=True)
+    if selected_item:
+        item_info = master_df[master_df["ITEM"] == selected_item].iloc[0]
+        st.markdown(f"""
+        <div class="info-box" style="margin-bottom:0.5rem;">
+            📦 <strong>{selected_item}</strong> &nbsp;|&nbsp;
+            Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
+            Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
+            Category: <strong>{item_info['CATEGORY'].upper()}</strong>
+        </div>
+        """, unsafe_allow_html=True)
 
-            st.markdown('<div class="card">', unsafe_allow_html=True)
-            st.markdown('<div class="section-title">Enter Quantities</div>', unsafe_allow_html=True)
+    if st.button("➕ Add to PO", type="secondary", use_container_width=True):
+        if not selected_item:
+            st.error("❌ Please select an ingredient.")
+        elif quantity <= 0:
+            st.error("❌ Quantity must be greater than 0.")
+        else:
+            st.session_state.po_items.append({
+                "item": selected_item,
+                "field_type": field_type,
+                "quantity": quantity,
+                "notes": item_notes,
+                "unit": str(item_info["UNIT OF MEASURE"]),
+                "category": str(item_info["CATEGORY"])
+            })
+            st.success(f"✅ **{selected_item}** added to PO.")
+            st.rerun()
 
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                addin    = st.number_input("➕ Add'l / In",      min_value=0.0, step=0.01, format="%.2f")
-                over     = st.number_input("🔼 Over",             min_value=0.0, step=0.01, format="%.2f")
-                damaged  = st.number_input("❌ Damaged / Out",    min_value=0.0, step=0.01, format="%.2f")
-            with c2:
-                cafe     = st.number_input("☕ Café",             min_value=0.0, step=0.01, format="%.2f")
-                bar      = st.number_input("🍸 Bar",              min_value=0.0, step=0.01, format="%.2f")
-                resto    = st.number_input("🍽️ Resto",            min_value=0.0, step=0.01, format="%.2f")
-            with c3:
-                kitchen  = st.number_input("🍳 Kitchen Ala Carte",min_value=0.0, step=0.01, format="%.2f")
-                banquet  = st.number_input("🎉 Kitchen Banquet",  min_value=0.0, step=0.01, format="%.2f")
-                notes    = st.text_input("📝 Notes (optional)")
+    st.markdown('</div>', unsafe_allow_html=True)
 
-            st.markdown('</div>', unsafe_allow_html=True)
+    # ── PO Cart / Review ───────────────────────────────────────────────────────
+    if st.session_state.po_items:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">PO Review — {len(st.session_state.po_items)} item(s)</div>', unsafe_allow_html=True)
 
-            if st.button("💾 Save Entry", type="primary", use_container_width=True):
+        # Display each item with a remove button
+        for idx, po_item in enumerate(st.session_state.po_items):
+            col_info, col_remove = st.columns([5, 1])
+            with col_info:
+                st.markdown(f"""
+                <div class="po-item-row">
+                    <strong>{idx+1}. {po_item['item']}</strong>
+                    &nbsp;|&nbsp; <span style="color:#0f3460;">{po_item['field_type']}</span>
+                    &nbsp;|&nbsp; <strong>{po_item['quantity']:,.2f} {po_item['unit']}</strong>
+                    {'&nbsp;|&nbsp; 📝 ' + po_item['notes'] if po_item['notes'] else ''}
+                </div>
+                """, unsafe_allow_html=True)
+            with col_remove:
+                if st.button("🗑️", key=f"remove_{idx}", help="Remove this item"):
+                    st.session_state.po_items.pop(idx)
+                    st.rerun()
+
+        st.markdown("---")
+
+        col_clear, col_submit = st.columns([1, 2])
+        with col_clear:
+            if st.button("🗑️ Clear PO", use_container_width=True):
+                st.session_state.po_items = []
+                st.rerun()
+        with col_submit:
+            if st.button("💾 Submit PO", type="primary", use_container_width=True):
                 if not staff_name.strip():
-                    st.error("❌ Please enter your name before saving.")
+                    st.error("❌ Please enter your name before submitting.")
                 else:
+                    po_number = generate_po_number(entry_date, department)
                     log_ws = ensure_sheet(spreadsheet, LOG_SHEET, LOG_HEADERS)
-                    row = [
-                        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                        entry_date.strftime("%b %Y").upper(),
-                        entry_date.strftime("%Y-%m-%d"),
-                        selected_item,
-                        staff_name.strip(),
-                        addin, over, damaged,
-                        cafe, bar, kitchen, banquet, resto,
-                        notes
-                    ]
-                    log_ws.append_row(row)
-
-                    # Update summary sheet
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
                     month_lbl = entry_date.strftime("%b %Y").upper()
-                    sum_sheet = f"SUMMARY - {month_lbl}"
-                    try:
-                        sum_ws = spreadsheet.worksheet(sum_sheet)
-                        records = sum_ws.get_all_records()
-                        for idx, rec in enumerate(records):
-                            if rec["ITEM"] == selected_item:
-                                row_num = idx + 2
-                                cols = ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR",
-                                        "KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]
-                                vals  = [addin, over, damaged, cafe, bar, kitchen, banquet, resto]
-                                for col, val in zip(cols, vals):
-                                    if val:
-                                        cur = float(rec.get(col, 0) or 0)
-                                        col_idx = SUMMARY_HEADERS.index(col) + 1
-                                        sum_ws.update_cell(row_num, col_idx, cur + val)
+                    date_str = entry_date.strftime("%Y-%m-%d")
 
-                                # Recalculate ending & worth
-                                updated = sum_ws.row_values(row_num)
-                                def gv(i): return float(updated[i-1]) if updated[i-1] else 0
-                                ending = gv(5)+gv(6)+gv(7)-gv(8)-gv(9)-gv(10)-gv(11)-gv(12)-gv(13)
-                                cost_v = gv(2)
-                                sum_ws.update_cell(row_num, 14, round(ending, 4))
-                                sum_ws.update_cell(row_num, 15, round(ending * cost_v, 4))
-                                break
-                    except Exception:
-                        pass
+                    rows_to_log = []
+                    for po_item in st.session_state.po_items:
+                        ft = po_item["field_type"]
+                        addin   = po_item["quantity"] if ft == "Add'l / In" else 0
+                        over    = po_item["quantity"] if ft == "Over" else 0
+                        damaged = po_item["quantity"] if ft == "Damaged / Out" else 0
+                        cafe    = po_item["quantity"] if ft == "Café" else 0
+                        bar     = po_item["quantity"] if ft == "Bar" else 0
+                        kitchen = po_item["quantity"] if ft == "Kitchen Ala Carte" else 0
+                        banquet = po_item["quantity"] if ft == "Kitchen Banquet" else 0
+                        resto   = po_item["quantity"] if ft == "Resto" else 0
 
-                    st.success(f"✅ Entry saved! **{selected_item}** logged by **{staff_name}** on **{entry_date}**")
+                        rows_to_log.append([
+                            timestamp, month_lbl, date_str,
+                            po_item["item"], staff_name.strip(),
+                            po_number, department,
+                            addin, over, damaged,
+                            cafe, bar, kitchen, banquet, resto,
+                            po_item["notes"]
+                        ])
+
+                    # Write all rows to log at once
+                    log_ws.append_rows(rows_to_log)
+
+                    # Update summary sheet for each item
+                    for po_item in st.session_state.po_items:
+                        ft = po_item["field_type"]
+                        update_summary_for_item(
+                            spreadsheet, entry_date, po_item["item"],
+                            po_item["quantity"] if ft == "Add'l / In" else 0,
+                            po_item["quantity"] if ft == "Over" else 0,
+                            po_item["quantity"] if ft == "Damaged / Out" else 0,
+                            po_item["quantity"] if ft == "Café" else 0,
+                            po_item["quantity"] if ft == "Bar" else 0,
+                            po_item["quantity"] if ft == "Kitchen Ala Carte" else 0,
+                            po_item["quantity"] if ft == "Kitchen Banquet" else 0,
+                            po_item["quantity"] if ft == "Resto" else 0,
+                        )
+
+                    item_count = len(st.session_state.po_items)
+                    st.session_state.po_items = []
+                    st.success(f"✅ PO **{po_number}** submitted! **{item_count} item(s)** logged by **{staff_name}** for **{department}** on **{entry_date}**.")
                     st.balloons()
+
+        st.markdown('</div>', unsafe_allow_html=True)
+    else:
+        st.info("Your PO is empty. Search and add items above.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: INGREDIENTS
@@ -545,7 +652,6 @@ elif page == "📦 Ingredients":
 elif page == "📅 Month Manager":
     st.markdown('<div class="main-header"><div><h1>📅 Month Manager</h1><p>Create new months and carry over ending stocks</p></div></div>', unsafe_allow_html=True)
 
-    # List existing summary sheets
     all_sheets = [ws.title for ws in spreadsheet.worksheets() if ws.title.startswith("SUMMARY - ")]
     months_available = [s.replace("SUMMARY - ", "") for s in all_sheets]
 
@@ -607,70 +713,116 @@ elif page == "📅 Month Manager":
 # PAGE: SEARCH & HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "🔍 Search & History":
-    st.markdown('<div class="main-header"><div><h1>🔍 Search & History</h1><p>Find any ingredient and see its full transaction log</p></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><div><h1>🔍 Search & History</h1><p>Find any ingredient or PO and see its full transaction log</p></div></div>', unsafe_allow_html=True)
 
     log_df = load_log(spreadsheet)
     master_df = load_master(spreadsheet)
 
-    search = st.text_input("🔍 Search Ingredient", placeholder="Type ingredient name...")
+    search_tab, po_tab = st.tabs(["🔍 Search by Ingredient", "📋 Search by PO Number"])
 
-    if search:
-        items_found = master_df[master_df["ITEM"].str.contains(search, case=False, na=False)]["ITEM"].tolist()
-        if not items_found:
-            st.warning("No ingredients found.")
-        else:
-            selected = st.selectbox("Select Ingredient", items_found)
-            if selected:
-                item_info = master_df[master_df["ITEM"] == selected].iloc[0]
+    with search_tab:
+        search = st.text_input("🔍 Search Ingredient", placeholder="Type ingredient name...")
 
-                st.markdown(f"""
-                <div class="info-box">
-                    📦 <strong>{selected}</strong> &nbsp;|&nbsp;
-                    Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
-                    Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
-                    Category: <strong>{item_info['CATEGORY'].upper()}</strong>
-                </div>
-                """, unsafe_allow_html=True)
+        if search:
+            items_found = master_df[master_df["ITEM"].str.contains(search, case=False, na=False)]["ITEM"].tolist()
+            if not items_found:
+                st.warning("No ingredients found.")
+            else:
+                selected = st.selectbox("Select Ingredient", items_found)
+                if selected:
+                    item_info = master_df[master_df["ITEM"] == selected].iloc[0]
 
-                if not log_df.empty:
-                    item_log = log_df[log_df["ITEM"] == selected].copy()
-                    if item_log.empty:
-                        st.info("No transactions recorded yet for this item.")
+                    st.markdown(f"""
+                    <div class="info-box">
+                        📦 <strong>{selected}</strong> &nbsp;|&nbsp;
+                        Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
+                        Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
+                        Category: <strong>{item_info['CATEGORY'].upper()}</strong>
+                    </div>
+                    """, unsafe_allow_html=True)
+
+                    if not log_df.empty:
+                        item_log = log_df[log_df["ITEM"] == selected].copy()
+                        if item_log.empty:
+                            st.info("No transactions recorded yet for this item.")
+                        else:
+                            item_log = item_log.sort_values("TIMESTAMP", ascending=False)
+                            st.markdown(f"**{len(item_log)} transaction(s) found**")
+
+                            c1, c2, c3, c4 = st.columns(4)
+                            def num(col): return pd.to_numeric(item_log.get(col, 0), errors="coerce").fillna(0).sum()
+                            with c1:
+                                st.metric("Total Add'l/In", f"{num('ADD\'L/IN'):,.2f}")
+                            with c2:
+                                st.metric("Total Damaged/Out", f"{num('DAMAGED/OUT'):,.2f}")
+                            with c3:
+                                total_used = num("CAFÉ") + num("BAR") + num("KITCHEN ALA CARTE") + num("KITCHEN BANQUET") + num("RESTO")
+                                st.metric("Total Used", f"{total_used:,.2f}")
+                            with c4:
+                                st.metric("Transactions", len(item_log))
+
+                            st.markdown("### Transaction Log")
+                            for _, row in item_log.iterrows():
+                                movements = []
+                                for col in ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR","KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]:
+                                    val = float(row.get(col, 0) or 0)
+                                    if val:
+                                        movements.append(f"{col}: **{val:,.2f}**")
+
+                                po_ref = row.get('PO NUMBER', '')
+                                dept_ref = row.get('DEPARTMENT', '')
+                                po_badge = f'&nbsp;|&nbsp; 🧾 <strong>{po_ref}</strong>' if po_ref else ''
+                                dept_badge = f'&nbsp;|&nbsp; 🏢 {dept_ref}' if dept_ref else ''
+
+                                st.markdown(f"""
+                                <div class="log-entry">
+                                    <div><strong>👤 {row.get('STAFF','—')}</strong> &nbsp;|&nbsp; 📅 {row.get('DATE','—')} &nbsp;|&nbsp; 📆 {row.get('MONTH','—')}{po_badge}{dept_badge}</div>
+                                    <div style='margin-top:4px;'>{' &nbsp;·&nbsp; '.join(movements) if movements else 'No quantities entered'}</div>
+                                    {'<div style="color:#888; font-size:0.8rem; margin-top:4px;">📝 ' + str(row.get('NOTES','')) + '</div>' if row.get('NOTES') else ''}
+                                    <div class="timestamp">{row.get('TIMESTAMP','')}</div>
+                                </div>
+                                """, unsafe_allow_html=True)
                     else:
-                        item_log = item_log.sort_values("TIMESTAMP", ascending=False)
-                        st.markdown(f"**{len(item_log)} transaction(s) found**")
+                        st.info("No transaction log yet.")
 
-                        # Summary metrics
-                        c1, c2, c3, c4 = st.columns(4)
-                        def num(col): return pd.to_numeric(item_log.get(col, 0), errors="coerce").fillna(0).sum()
-                        with c1:
-                            st.metric("Total Add'l/In", f"{num('ADD\'L/IN'):,.2f}")
-                        with c2:
-                            st.metric("Total Damaged/Out", f"{num('DAMAGED/OUT'):,.2f}")
-                        with c3:
-                            total_used = num("CAFÉ") + num("BAR") + num("KITCHEN ALA CARTE") + num("KITCHEN BANQUET") + num("RESTO")
-                            st.metric("Total Used", f"{total_used:,.2f}")
-                        with c4:
-                            st.metric("Transactions", len(item_log))
+    with po_tab:
+        po_search = st.text_input("🧾 Search PO Number", placeholder="e.g. PO-20260628...")
 
-                        st.markdown("### Transaction Log")
-                        for _, row in item_log.iterrows():
+        if po_search and not log_df.empty:
+            if "PO NUMBER" in log_df.columns:
+                po_log = log_df[log_df["PO NUMBER"].astype(str).str.contains(po_search, case=False, na=False)]
+                if po_log.empty:
+                    st.warning("No PO found with that number.")
+                else:
+                    po_numbers = po_log["PO NUMBER"].unique()
+                    for po_num in po_numbers:
+                        po_entries = po_log[po_log["PO NUMBER"] == po_num]
+                        first = po_entries.iloc[0]
+                        st.markdown(f"""
+                        <div class="info-box">
+                            🧾 <strong>{po_num}</strong> &nbsp;|&nbsp;
+                            📅 {first.get('DATE','—')} &nbsp;|&nbsp;
+                            👤 {first.get('STAFF','—')} &nbsp;|&nbsp;
+                            🏢 {first.get('DEPARTMENT','—')} &nbsp;|&nbsp;
+                            <strong>{len(po_entries)} item(s)</strong>
+                        </div>
+                        """, unsafe_allow_html=True)
+
+                        for _, row in po_entries.iterrows():
                             movements = []
                             for col in ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR","KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]:
                                 val = float(row.get(col, 0) or 0)
                                 if val:
                                     movements.append(f"{col}: **{val:,.2f}**")
-
                             st.markdown(f"""
                             <div class="log-entry">
-                                <div><strong>👤 {row.get('STAFF','—')}</strong> &nbsp;|&nbsp; 📅 {row.get('DATE','—')} &nbsp;|&nbsp; 📆 {row.get('MONTH','—')}</div>
-                                <div style='margin-top:4px;'>{' &nbsp;·&nbsp; '.join(movements) if movements else 'No quantities entered'}</div>
+                                <div><strong>📦 {row.get('ITEM','—')}</strong></div>
+                                <div style='margin-top:4px;'>{' &nbsp;·&nbsp; '.join(movements) if movements else 'No quantities'}</div>
                                 {'<div style="color:#888; font-size:0.8rem; margin-top:4px;">📝 ' + str(row.get('NOTES','')) + '</div>' if row.get('NOTES') else ''}
-                                <div class="timestamp">{row.get('TIMESTAMP','')}</div>
                             </div>
                             """, unsafe_allow_html=True)
-                else:
-                    st.info("No transaction log yet.")
+            else:
+                st.info("No PO data found. Old entries may not have PO numbers.")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: SUMMARY
@@ -695,7 +847,6 @@ elif page == "📊 Summary":
             if "All" not in cat_filter and cat_filter:
                 df = df[df["CATEGORY"].isin(cat_filter)]
 
-            # Metrics row
             total_worth = pd.to_numeric(df["TOTAL WORTH OF STOCKS"], errors="coerce").fillna(0).sum()
             total_items = len(df[pd.to_numeric(df["ENDING STOCKS"], errors="coerce").fillna(0) > 0])
 
@@ -738,14 +889,12 @@ elif page == "⬇️ Export to Excel":
             ws_out = wb.active
             ws_out.title = "SUMMARY"
 
-            # Header styling
             header_fill = PatternFill("solid", fgColor="1a1a2e")
             header_font = Font(bold=True, color="FFFFFF", size=11)
             header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
             thin = Side(style="thin", color="CCCCCC")
             border = Border(left=thin, right=thin, top=thin, bottom=thin)
 
-            # Title row
             ws_out.merge_cells("A1:O1")
             title_cell = ws_out["A1"]
             title_cell.value = f"SERVANDO MAIN WAREHOUSE INVENTORY — {selected_month}"
@@ -754,7 +903,6 @@ elif page == "⬇️ Export to Excel":
             title_cell.alignment = Alignment(horizontal="center", vertical="center")
             ws_out.row_dimensions[1].height = 30
 
-            # Headers row
             for col_idx, header in enumerate(SUMMARY_HEADERS, 1):
                 cell = ws_out.cell(row=2, column=col_idx, value=header)
                 cell.fill = header_fill
@@ -763,7 +911,6 @@ elif page == "⬇️ Export to Excel":
                 cell.border = border
             ws_out.row_dimensions[2].height = 40
 
-            # Data rows
             cat_colors = {
                 "beverage": "EBF5FB", "beef": "FDEDEC", "chicken": "FEF9E7",
                 "seafood": "E8F8F5", "fresh": "E9F7EF", "dry": "FDF2E9",
@@ -788,7 +935,6 @@ elif page == "⬇️ Export to Excel":
                     else:
                         cell.alignment = Alignment(vertical="center")
 
-            # Total row
             total_row = len(df) + 3
             ws_out.cell(row=total_row, column=1, value="TOTAL WORTH OF STOCKS").font = Font(bold=True)
             ws_out.cell(row=total_row, column=1).fill = PatternFill("solid", fgColor="1a1a2e")
@@ -800,7 +946,6 @@ elif page == "⬇️ Export to Excel":
             tw_cell.font = Font(bold=True, color="FFFFFF")
             tw_cell.number_format = '#,##0.0000'
 
-            # Column widths
             col_widths = [35, 12, 16, 12, 16, 10, 10, 14, 10, 10, 18, 18, 10, 15, 20]
             for i, w in enumerate(col_widths, 1):
                 ws_out.column_dimensions[get_column_letter(i)].width = w
