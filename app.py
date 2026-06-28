@@ -1550,3 +1550,56 @@ elif page == "⚙️ Setup":
     with c2: st.metric("Total Transactions", len(log_df))
     with c3: st.metric("Active Items", len(items_df[items_df["ACTIVE"]=="YES"]) if not items_df.empty else 0)
     st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("---")
+    st.markdown('<div class="section-title" style="color:#CC6A6A;">⚠️ Danger Zone — Reset / Clear Data</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#CC6A6A;font-size:0.82rem;margin-bottom:1rem;">These actions are permanent and cannot be undone. Type the confirmation word before proceeding.</div>', unsafe_allow_html=True)
+
+    # Clear Transactions only
+    st.markdown('<div class="card" style="border-color:#3A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Clear All Transactions (Keep Items)</div>', unsafe_allow_html=True)
+    st.write("Wipes the entire transaction log (deliveries, POs, adjustments). Your item list stays intact.")
+    confirm1 = st.text_input("Type **CLEAR TRANSACTIONS** to confirm", key="confirm_txn")
+    if st.button("🗑️ Clear Transactions", key="btn_clear_txn"):
+        if confirm1.strip().upper() == "CLEAR TRANSACTIONS":
+            ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
+            ws.clear()
+            ws.append_row(LOG_HEADERS)
+            invalidate_cache()
+            st.success("✅ All transactions cleared. Items list is untouched.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Clear Items only
+    st.markdown('<div class="card" style="border-color:#3A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Clear All Items (Keep Transactions)</div>', unsafe_allow_html=True)
+    st.write("Wipes the entire items master list. Transaction history stays intact.")
+    confirm2 = st.text_input("Type **CLEAR ITEMS** to confirm", key="confirm_items")
+    if st.button("🗑️ Clear Items", key="btn_clear_items"):
+        if confirm2.strip().upper() == "CLEAR ITEMS":
+            ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+            ws.clear()
+            ws.append_row(ITEMS_HEADERS)
+            invalidate_cache()
+            st.success("✅ All items cleared. Transaction log is untouched.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Full Reset
+    st.markdown('<div class="card" style="border-color:#5A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title" style="color:#CC6A6A;">Full Reset — Clear Everything</div>', unsafe_allow_html=True)
+    st.write("Wipes **both** the items list and all transactions. Complete fresh start.")
+    confirm3 = st.text_input("Type **FULL RESET** to confirm", key="confirm_full")
+    if st.button("💥 Full Reset", key="btn_full_reset"):
+        if confirm3.strip().upper() == "FULL RESET":
+            for sheet_name, headers in [(ITEMS_SHEET, ITEMS_HEADERS), (LOG_SHEET, LOG_HEADERS)]:
+                ws = ensure_sheet(ss, sheet_name, headers)
+                ws.clear()
+                ws.append_row(headers)
+            invalidate_cache()
+            st.success("✅ Full reset complete. Everything has been cleared.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
