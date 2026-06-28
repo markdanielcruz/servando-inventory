@@ -3,21 +3,19 @@ import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
 import pandas as pd
-import json
 from io import BytesIO
 import openpyxl
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-# ── Page config ────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Servando Inventory",
+    page_title="Servando Warehouse Inventory",
     page_icon="🏪",
     layout="wide",
     initial_sidebar_state="expanded"
 )
 
-# ── Styling ────────────────────────────────────────────────────────────────────
+# ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
@@ -30,58 +28,50 @@ html, body, [class*="css"] {
 }
 .stApp {
     background-color: #0A1208;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700' viewBox='0 0 900 700'%3E%3Crect width='900' height='700' fill='%230A1208'/%3E%3Cg opacity='0.28'%3E%3Cpath d='M-10,700 C30,580 110,510 165,415 C192,362 180,298 155,258 C198,302 214,370 192,425 C242,358 252,265 230,196 C272,275 260,378 228,445 C276,368 298,254 286,162 C324,250 300,376 262,458 C235,512 196,596 168,700Z' fill='%231A4A1F'/%3E%3Cline x1='155' y1='258' x2='98' y2='700' stroke='%232A6B2F' stroke-width='1.5' opacity='0.45'/%3E%3C/g%3E%3Cg opacity='0.22' transform='translate(860,0)'%3E%3Cpath d='M20,700 C0,580 -42,498 -78,415 C-100,358 -88,288 -64,242 C-98,292 -110,368 -92,425 C-130,352 -136,254 -112,185 C-152,270 -140,386 -106,450 C-140,362 -172,244 -166,138 C-196,242 -168,382 -128,462 C-104,518 -70,600 -46,700Z' fill='%231A4A1F'/%3E%3C/g%3E%3Cg opacity='0.18' transform='translate(370,-70)'%3E%3Cpath d='M70,0 C26,92 -4,206 12,322 C-28,258 -40,162 -12,80 C-62,126 -74,242 -46,334 C-86,270 -82,160 -56,80 C-104,160 -92,292 -56,390 C-28,430 18,458 64,452 C108,446 150,406 164,350 C182,270 166,154 124,80 C144,160 138,276 112,338 C130,248 126,132 98,58 C78,-16 74,-16 70,0Z' fill='%23163D1A'/%3E%3C/g%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='900' height='700' viewBox='0 0 900 700'%3E%3Crect width='900' height='700' fill='%230A1208'/%3E%3Cg opacity='0.28'%3E%3Cpath d='M-10,700 C30,580 110,510 165,415 C192,362 180,298 155,258 C198,302 214,370 192,425 C242,358 252,265 230,196 C272,275 260,378 228,445 C276,368 298,254 286,162 C324,250 300,376 262,458 C235,512 196,596 168,700Z' fill='%231A4A1F'/%3E%3C/g%3E%3Cg opacity='0.22' transform='translate(860,0)'%3E%3Cpath d='M20,700 C0,580 -42,498 -78,415 C-100,358 -88,288 -64,242 C-98,292 -110,368 -92,425 C-130,352 -136,254 -112,185 C-152,270 -140,386 -106,450 C-140,362 -172,244 -166,138 C-196,242 -168,382 -128,462 C-104,518 -70,600 -46,700Z' fill='%231A4A1F'/%3E%3C/g%3E%3Cg opacity='0.18' transform='translate(370,-70)'%3E%3Cpath d='M70,0 C26,92 -4,206 12,322 C-28,258 -40,162 -12,80 C-62,126 -74,242 -46,334 C-86,270 -82,160 -56,80 C-104,160 -92,292 -56,390 C-28,430 18,458 64,452 C108,446 150,406 164,350 C182,270 166,154 124,80 C144,160 138,276 112,338 C130,248 126,132 98,58 C78,-16 74,-16 70,0Z' fill='%23163D1A'/%3E%3C/g%3E%3C/svg%3E");
     background-attachment: fixed;
     background-size: cover;
-    background-position: center;
 }
-
-/* Sidebar */
 [data-testid="stSidebar"] {
-    background-color: rgba(8, 14, 8, 0.92) !important;
+    background-color: rgba(8,14,8,0.95) !important;
     border-right: 1px solid #2A3828;
     backdrop-filter: blur(8px);
 }
 [data-testid="stSidebar"] * { color: #D4D0C8 !important; }
-
-/* Header */
 .main-header {
     background: linear-gradient(135deg, rgba(26,46,26,0.85) 0%, rgba(21,37,21,0.85) 100%);
     border: 1px solid #2A3828;
     border-radius: 12px;
-    padding: 24px 32px;
-    margin-bottom: 24px;
-    display: flex;
-    align-items: center;
-    gap: 20px;
+    padding: 20px 28px;
+    margin-bottom: 20px;
     backdrop-filter: blur(6px);
 }
 .main-header h1 {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 1.8rem;
+    font-size: 1.7rem;
     color: #8CAF7A;
     margin: 0 0 2px 0;
     font-weight: 600;
-    letter-spacing: 1px;
 }
-.main-header p {
-    font-size: 0.7rem;
-    letter-spacing: 2.5px;
-    text-transform: uppercase;
-    color: #4A6B3E;
-    margin: 0;
-}
-
-/* Cards */
+.main-header p { font-size: 0.7rem; letter-spacing: 2.5px; text-transform: uppercase; color: #4A6B3E; margin: 0; }
 .card {
     background: #111E11;
     border: 1px solid #1E2E1C;
     border-radius: 12px;
-    padding: 1.5rem;
+    padding: 1.25rem 1.5rem;
     margin-bottom: 1rem;
 }
-
-/* Buttons */
+.section-title {
+    font-size: 0.62rem;
+    font-weight: 600;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: #5A7A52;
+    margin-bottom: 0.75rem;
+    padding-bottom: 6px;
+    border-bottom: 1px solid #1E2E1C;
+    display: block;
+}
 .stButton > button {
     background-color: #2A3E28 !important;
     color: #A8C896 !important;
@@ -89,7 +79,6 @@ html, body, [class*="css"] {
     border-radius: 8px !important;
     font-weight: 600 !important;
     font-size: 0.82rem !important;
-    letter-spacing: 0.8px !important;
     transition: all 0.2s !important;
 }
 .stButton > button:hover {
@@ -97,8 +86,6 @@ html, body, [class*="css"] {
     border-color: #5A7A52 !important;
     color: #C8DCC0 !important;
 }
-
-/* Input fields */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > textarea,
@@ -109,930 +96,1457 @@ html, body, [class*="css"] {
     color: #D4D0C8 !important;
     font-size: 0.88rem !important;
 }
-.stTextInput > div > div > input:focus,
-.stNumberInput > div > div > input:focus {
-    border-color: #5A7A52 !important;
-    box-shadow: 0 0 0 2px rgba(90,122,82,0.2) !important;
-}
-
-label {
-    color: #8A9E84 !important;
-    font-size: 0.78rem !important;
-    font-weight: 500 !important;
-}
-
-/* Section titles */
-.section-title {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #5A7A52;
-    margin-bottom: 1rem;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #1E2E1C;
-    display: block;
-}
-
-/* Log entry */
+label { color: #8A9E84 !important; font-size: 0.78rem !important; font-weight: 500 !important; }
 .log-entry {
     background: #0E1810;
     border-left: 3px solid #3A5238;
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
     border-radius: 0 8px 8px 0;
-    margin-bottom: 0.5rem;
-    font-size: 0.9rem;
+    margin-bottom: 0.4rem;
+    font-size: 0.88rem;
     color: #D4D0C8;
 }
-.log-entry .timestamp { color: #4A6B3E; font-size: 0.8rem; }
-
-/* PO item row */
 .po-item-row {
     background: #0E1810;
     border: 1px solid #2A3828;
     border-radius: 8px;
-    padding: 0.75rem 1rem;
-    margin-bottom: 0.5rem;
+    padding: 0.6rem 1rem;
+    margin-bottom: 0.4rem;
     color: #D4D0C8;
-}
-
-/* Badge */
-.badge {
-    display: inline-block;
-    padding: 2px 10px;
-    border-radius: 20px;
-    font-size: 0.75rem;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-.badge-beverage { background: #0E1E2E; color: #6AABCC; }
-.badge-dry { background: #1E1A0E; color: #C4A840; }
-.badge-fresh { background: #0E1E12; color: #5AAA6A; }
-.badge-wet { background: #0E1C1A; color: #4AAA96; }
-.badge-beef { background: #1E0E0E; color: #CC6A6A; }
-.badge-chicken { background: #1E160E; color: #CC8A4A; }
-.badge-seafood { background: #0E1620; color: #4A8ACC; }
-.badge-pork { background: #1E0E0E; color: #CC5A5A; }
-.badge-rtc { background: #1A0E1E; color: #AA6ACC; }
-
-/* Success/info boxes */
-.success-box {
-    background: #1A2E1A;
-    border: 1px solid #3A5238;
-    border-radius: 8px;
-    padding: 0.75rem 1rem;
-    color: #A8C896;
-    margin: 0.5rem 0;
 }
 .info-box {
     background: #111E11;
     border: 1px solid #2A3828;
     border-radius: 8px;
-    padding: 0.75rem 1rem;
+    padding: 0.6rem 1rem;
     color: #8CAF7A;
-    margin: 0.5rem 0;
+    margin: 0.4rem 0;
+    font-size: 0.88rem;
 }
-
-/* Metrics */
+.success-box {
+    background: #1A2E1A;
+    border: 1px solid #3A5238;
+    border-radius: 8px;
+    padding: 0.6rem 1rem;
+    color: #A8C896;
+    margin: 0.4rem 0;
+}
 [data-testid="metric-container"] {
     background: #111E11 !important;
     border: 1px solid #1E2E1C !important;
     border-radius: 10px !important;
-    padding: 14px 16px !important;
+    padding: 12px 14px !important;
 }
 [data-testid="metric-container"] label {
-    font-size: 0.62rem !important;
-    letter-spacing: 2px !important;
-    text-transform: uppercase !important;
-    color: #5A7A52 !important;
+    font-size: 0.6rem !important; letter-spacing: 2px !important;
+    text-transform: uppercase !important; color: #5A7A52 !important;
 }
 [data-testid="stMetricValue"] {
     font-family: 'Cormorant Garamond', serif !important;
-    font-size: 1.6rem !important;
-    font-weight: 600 !important;
-    color: #A8C896 !important;
+    font-size: 1.5rem !important; font-weight: 600 !important; color: #A8C896 !important;
 }
-
-/* Table */
-[data-testid="stDataFrame"] {
-    border: 1px solid #1E2E1C !important;
-    border-radius: 10px !important;
-    overflow: hidden !important;
-}
+[data-testid="stDataFrame"] { border: 1px solid #1E2E1C !important; border-radius: 10px !important; }
 hr { border-color: #1E2E1C !important; }
-h3 {
-    font-family: 'Cormorant Garamond', serif !important;
-    color: #A8C896 !important;
-    font-size: 1.3rem !important;
-}
+h3 { font-family: 'Cormorant Garamond', serif !important; color: #A8C896 !important; }
 </style>
 """, unsafe_allow_html=True)
 
-# ── Google Sheets Connection ───────────────────────────────────────────────────
+# ── Constants ──────────────────────────────────────────────────────────────────
 SPREADSHEET_ID = "1pYqecDqe_qUwkexRiG5mmOaYV58_1uoRCx_Yy4CepNQ"
 SCOPES = ["https://spreadsheets.google.com/feeds", "https://www.googleapis.com/auth/drive"]
 
+ITEMS_SHEET    = "v2_ITEMS"
+LOG_SHEET      = "v2_LOG"
+
+ITEMS_HEADERS  = ["ITEM", "UNIT COST", "UNIT OF MEASURE", "CATEGORY", "BEGINNING_STOCKS", "ACTIVE"]
+LOG_HEADERS    = ["TIMESTAMP", "DATE", "MONTH", "ITEM", "STAFF", "TXN_TYPE", "REF_NUMBER",
+                  "ADD_IN", "OVER", "RESTAURANT", "BANQUET", "CAFE", "BAR", "OTHERS", "SPOILAGE", "NOTES"]
+
+DEPARTMENTS    = ["Restaurant", "Banquet", "Café", "Bar", "Others"]
+CATEGORIES     = ["beverage","beef","chicken","pork","seafood","fresh","dry","wet","rtc","meat","frozen","dessert","other"]
+
+# ── 557 items from May 2026 ────────────────────────────────────────────────────
+INITIAL_ITEMS = [
+('Absolut Vodka Blue', 5100.0, 0.92, 'ml', 'beverage'),
+('Accord Powder', 0.0, 0.19, 'gram', 'dry'),
+('Agave Syrup 1.02kg', 14280.0, 1.088235294117647, 'ml', 'wet'),
+('Almond - Ground', 3000.0, 1.08, 'gram', 'dry'),
+('Amaretto Disaronno 700 ml', 5600.0, 1.32, 'ml', 'beverage'),
+('Ampalaya - Fresh', 0.0, 0.18, 'gram', 'fresh'),
+('Ampalaya - Dahon', 0.0, 0.41, 'gram', 'fresh'),
+('Anchovies', 448.0, 3.3035714285714284, 'gram', 'wet'),
+('Anisado Wine', 0.0, 0.21428571428571427, 'ml', 'wet'),
+('Aperol 700 ml', 4900.0, 1.2857142857142858, 'ml', 'beverage'),
+('Apog Powder', 0.0, 3.01, 'gram', 'dry'),
+('Apple - Red', 0.0, 0.16, 'gram', 'fresh'),
+('Atsuete / Annatto -  Seeds', 0.0, 0.85, 'gram', 'dry'),
+('Atsuete / Annatto - Powdered', 0.0, 0.33, 'gram', 'dry'),
+('Bacardi - Gold Rum 750ml', 1500.0, 0.9333333333333333, 'ml', 'beverage'),
+('Bacardi - Premium Black 750ml', 3000.0, 1.1666666666666667, 'ml', 'beverage'),
+('Bacardi - Superior White 750 ml', 1500.0, 2.3066666666666666, 'ml', 'beverage'),
+('Baguio Beans', 0.0, 0.18, 'gram', 'fresh'),
+("Bailey's Original 700 ml", 3500.0, 1.1428571428571428, 'bottle', 'beverage'),
+("Baker's Best Margarine 225g", 4050.0, 0.28, 'gram', 'wet'),
+('Baking Powder', 1000.0, 0.22, 'gram', 'dry'),
+('Baking Soda', 4535.0, 0.4852941176470588, 'gram', 'dry'),
+('Balls - Mozarella', 0.0, 1.16, 'gram', 'rtc'),
+('Balls - Shrimp', 0.0, 0.215, 'gram', 'rtc'),
+('Balls - Squid', 0.0, 0.297, 'gram', 'rtc'),
+('Bambi Spring Roll Wrapper - Big 25 pcs', 0.0, 10.0, 'piece', 'rtc'),
+('Bambi Spring Roll Wrapper Small - 35 pcs', 0.0, 8.0, 'piece', 'rtc'),
+('Banana - Lakatan', 0.0, 0.14, 'gram', 'fresh'),
+('Banana - Saba', 0.0, 0.08, 'gram', 'fresh'),
+('Banana - Sweetened, for Halo halo per gram', 13000.0, 0.19, 'gram', 'fresh'),
+('Banana Blossom', 0.0, 0.57, 'gram', 'dry'),
+('Banana Essence', 0.0, 3.75, 'ml', 'wet'),
+('Banana Ketchup', 0.0, 0.77, 'ml', 'wet'),
+('Bangus - Daing (pack of 3, per piece)', 0.0, 75.0, 'piece', 'seafood'),
+('Bangus - Smoked Milkfish, Tinapa (420 grams)', 9.0, 360.0, 'piece', 'seafood'),
+('Bangus - Unseasoned Fillet - 520 grams', 13.0, 298.0, 'piece', 'seafood'),
+('Barbeque Sauce - Ready made', 0.0, 2.2, 'ml', 'wet'),
+('Barrio Fiesta Bagoong Regular', 7000.0, 0.45, 'gram', 'wet'),
+('Basil Leaves - Dried', 0.0, 1.49, 'gram', 'dry'),
+('Bay Leaves', 0.0, 3.0, 'gram', 'dry'),
+('Beans - for Halo halo per gram', 12000.0, 0.24, 'gram', 'wet'),
+('Beef - Brisket', 78670.0, 0.48, 'gram', 'beef'),
+('Beef - Feet', 0.0, 0.24, 'gram', 'beef'),
+('Beef - Ground', 5000.0, 0.395, 'gram', 'beef'),
+('Beef - Shank', 40120.09, 0.43, 'gram', 'beef'),
+('Beef - Skin', 5000.0, 0.22, 'gram', 'beef'),
+('Belgian Waffle Mix', 0.0, 0.328, 'gram', 'dry'),
+('Bell Pepper - Green', 0.0, 0.3, 'gram', 'fresh'),
+('Bell Pepper - Red', 0.0, 0.3, 'gram', 'fresh'),
+('Black Beans', 0.0, 0.47, 'gram', 'wet'),
+('Black Olives - Pitted, Sliced', 6075.0, 0.6977777777777778, 'gram', 'wet'),
+('Black Pepper - Ground', 1000.0, 0.698, 'gram', 'dry'),
+('Black Pepper - Whole', 0.0, 1.2, 'gram', 'dry'),
+('Blue Curacao 1 liter', 2000.0, 0.52, 'ml', 'beverage'),
+('Blue Lemonade Powdered Juice 500g', 2000.0, 1.175, 'gram', 'beverage'),
+('Bombay Sapphire Gin 750 ml', 1900.0, 1.6, 'ml', 'beverage'),
+('Bread Crumbs - Fine', 0.0, 0.18, 'gram', 'dry'),
+('Bread Crumbs - Japanese', 3000.0, 0.18, 'gram', 'dry'),
+('Broccoli', 0.0, 0.12, 'gram', 'fresh'),
+('Broth Cubes - Beef', 2220.0, 0.75, 'gram', 'rtc'),
+('Broth Cubes - Chicken', 600.0, 0.75, 'gram', 'rtc'),
+('Broth Cubes - Pork', 840.0, 0.75, 'gram', 'rtc'),
+('Broth Cubes - Shrimp', 2400.0, 0.75, 'gram', 'rtc'),
+('Butter - Unsalted', 0.0, 0.3, 'gram', 'rtc'),
+('Cabbage', 0.0, 0.1, 'gram', 'fresh'),
+('Cabbage - Red', 0.0, 0.42, 'gram', 'fresh'),
+('Cajun Powder', 0.0, 1.7875, 'gram', 'wet'),
+('Calamansi - Concentrate, with Honey', 0.0, 0.48, 'ml', 'wet'),
+('Calamansi - Fresh', 0.0, 0.14, 'gram', 'fresh'),
+('Calamansi - Pure, Unsweetened', 1000.0, 0.2, 'ml', 'wet'),
+('Campari Bitter 750 ml', 3000.0, 1.56, 'ml', 'beverage'),
+('Canada Dry Ginger Ale 355 ml', 36.0, 50.0, 'can', 'beverage'),
+('Canned Tuna', 0.0, 0.361, 'can', 'rtc'),
+('Capers', 400.0, 0.9614035087719298, 'gram', 'wet'),
+('Caramel Sauce - Torani', 0.0, 0.65, 'ml', 'wet'),
+('Carrots', 0.0, 0.19, 'gram', 'fresh'),
+('Casa Okinawa Flavor', 0.0, 0.43, 'gram', 'dry'),
+('Cascina Italian Pesto 540 g per bottle', 9.0, 394.0, 'jar', 'wet'),
+('Cauliflower', 0.0, 0.32, 'gram', 'fresh'),
+('Cayenne pepper', 450.0, 2.8846153846153846, 'gram', 'dry'),
+('Celery', 0.0, 0.18, 'gram', 'fresh'),
+('Cheese  - Sauce (500g)', 0.0, 0.65, 'ml', 'wet'),
+('Cheese - Cheddar - Block', 10020.0, 0.4025, 'gram', 'rtc'),
+('Cheese - Filled', 2700.0, 0.31, 'gram', 'rtc'),
+('Cheese - Mozarella - Block', 38890.0, 0.5, 'gram', 'rtc'),
+('Cheese - Parmesan - Ground', 10938.0, 1.18, 'gram', 'rtc'),
+('Cheese - Parmesan Block', 0.0, 1.66, 'gram', 'rtc'),
+('Cheese - Quickmelt', 3600.0, 0.4633333333333333, 'gram', 'rtc'),
+('Chicken - Breast Fillet', 12000.0, 0.26, 'gram', 'chicken'),
+('Chicken - Breast, Bone In', 0.0, 0.24, 'gram', 'chicken'),
+('Chicken - Leg Quarter Bone In', 15000.0, 0.21, 'gram', 'chicken'),
+('Chicken - Leg Quarter Fillet Boneless', 56000.0, 0.335, 'gram', 'chicken'),
+('Chicken - Liver', 6000.0, 0.265, 'gram', 'chicken'),
+('Chicken - Skin', 0.0, 0.175, 'gram', 'chicken'),
+('Chicken - Whole', 0.0, 0.235, 'gram', 'chicken'),
+('Chicken - Wings', 0.0, 0.18, 'gram', 'chicken'),
+('Chili - Flakes', 0.0, 0.55, 'gram', 'dry'),
+('Chili - Green', 0.0, 0.25, 'gram', 'fresh'),
+('Chili - Labuyo', 0.0, 0.2, 'gram', 'fresh'),
+('Chili - Leaves', 0.0, 0.12, 'gram', 'dry'),
+('Chili - Powder', 0.0, 0.27, 'gram', 'dry'),
+('Chorizo - Bilbao', 0.0, 1.9857142857142858, 'gram', 'meat'),
+('Chorizo - Macao', 0.0, 0.6363636363636364, 'gram', 'meat'),
+('Chorizo - Spanish', 0.0, 0.65, 'gram', 'meat'),
+('Cinnamon - Ground', 200.0, 0.745, 'gram', 'dry'),
+('Cinnamon Sticks', 539.0, 1.39, 'gram', 'dry'),
+('Cloves - Powder', 0.0, 2.744186046511628, 'gram', 'dry'),
+('Cocoa Powder', 1000.0, 2.331288343558282, 'gram', 'dry'),
+('Coconut - Shredded', 0.0, 55.0, 'gram', 'fresh'),
+('Coconut Cream per can', 8.0, 55.0, 'can', 'wet'),
+('Coconut Rum - Malibu', 5600.0, 1.0271428571428571, 'ml', 'beverage'),
+('Coconut Water - Vita Coco', 0.0, 0.15151515151515152, 'ml', 'beverage'),
+('Coffee Beans - Silcafe', 0.0, 0.73, 'gram', 'dry'),
+('Coke 1.5L per ml', 0.0, 0.095, 'ml', 'beverage'),
+('Coke Original 320 ml', 50.0, 37.0, 'can', 'beverage'),
+('Coke Zero 320 ml', 67.0, 37.0, 'can', 'beverage'),
+('Cooking Sake1 Liter per ml', 0.0, 0.23, 'ml', 'wet'),
+('Coriander Powder', 0.0, 0.49, 'gram', 'dry'),
+('Corn - Kernels, Canned per gram', 425.0, 0.14285714285714285, 'gram', 'wet'),
+('Corn - Sweet Style, Canned per gram', 425.0, 0.18823529411764706, 'gram', 'wet'),
+('Corn Flakes', 0.0, 0.3073770491803279, 'gram', 'dry'),
+('Cornstarch', 0.0, 0.07, 'gram', 'dry'),
+('Corona Beer 330 ml', 144.0, 70.0, 'bottle', 'beverage'),
+('Crab Meat, Frozen', 5000.0, 1.327, 'gram', 'seafood'),
+('Crab Paste', 908.0, 0.8810572687224669, 'gram', 'wet'),
+('Crab Stick', 0.0, 0.329, 'gram', 'seafood'),
+('Cream - All Purpose, 250ml per ml', 12000.0, 0.32, 'ml', 'wet'),
+('Cream - Coconut per ml', 57200.0, 0.2125, 'ml', 'wet'),
+('Cream - Cooking', 0.0, 0.35, 'ml', 'wet'),
+('Cream - Full Whipping', 0.0, 0.12, 'liter', 'wet'),
+('Cream - Mascarpone', 11000.0, 0.89, 'ml', 'wet'),
+('Cream - Sour', 0.0, 0.496, 'ml', 'wet'),
+('Cream Cheese', 1125.0, 0.8666666666666667, 'gram', 'rtc'),
+('Cream Dory - Fillet', 3000.0, 0.135, 'gram', 'seafood'),
+('Cream Of Mushroom, Powdered', 1550.0, 0.8064516129032258, 'gram', 'wet'),
+('Cream of Tartar', 0.0, 0.962, 'gram', 'dry'),
+('Creamer Sachet (100 pcs, per piece)', 500.0, 2.0, 'piece', 'dry'),
+('Crushed Graham', 1000.0, 0.225, 'gram', 'dry'),
+('Cucumber - Fresh', 0.0, 0.13, 'gram', 'fresh'),
+('Cumin - Ground', 600.0, 0.842, 'gram', 'dry'),
+('Curacao Triple Sec 750 ml', 0.0, 0.6, 'ml', 'beverage'),
+('Custard Powder - Cremyvit', 18000.0, 0.51, 'gram', 'dry'),
+('Dari Cream Margarine 200g', 0.0, 0.47, 'gram', 'rtc'),
+('Dark Chocolate - Bar', 1000.0, 0.389, 'gram', 'dry'),
+('Dark Chocolate - Droplets', 1000.0, 0.558, 'gram', 'dry'),
+('Dark Chocolate Sauce - Torani', 0.0, 0.7, 'ml', 'wet'),
+('Dessicated Coconut', 0.0, 0.325, 'gram', 'dry'),
+('Dijon Mustard', 1362.0, 0.914, 'bottle', 'wet'),
+('Dill - Fresh', 0.0, 0.81, 'gram', 'fresh'),
+('Double Chocolate Powder', 0.0, 1.01, 'gram', 'dry'),
+('Easy Cream Base (Frappe Base) per gram', 10000.0, 0.405, 'gram', 'dry'),
+('Eden Cheese per gram', 0.0, 0.372, 'gram', 'rtc'),
+('Edible Leaf Foil Gold Flakes per gram', 36.0, 16.0, 'gram', 'dry'),
+('Egg - Fresh (per piece)', 0.0, 12.0, 'piece', 'fresh'),
+('Egg - Salted (per piece)', 0.0, 20.0, 'piece', 'fresh'),
+('Eggplant - Fresh', 0.0, 0.13, 'gram', 'fresh'),
+('Elderflower Liqueur', 0.0, 2.7857142857142856, 'ml', 'beverage'),
+('Evian Water', 0.0, 95.0, 'bottle', 'beverage'),
+('Feuilletine', 0.0, 2.67, 'gram', 'dry'),
+('Fish Sauce (Patis)', 6000.0, 0.08, 'ml', 'wet'),
+('Five Spice Powder', 0.0, 0.425, 'gram', 'dry'),
+('Flour - All Purpose', 25000.0, 0.0584, 'gram', 'dry'),
+('Flour - Bread', 0.0, 0.065, 'gram', 'dry'),
+('Flour - Cake', 2000.0, 0.07, 'gram', 'dry'),
+('Flour - Caputo (00 Flour)', 25000.0, 0.16, 'gram', 'dry'),
+('Flour - Glutinous Rice', 0.0, 0.11, 'gram', 'dry'),
+('Flour - Rice', 0.0, 0.07, 'gram', 'dry'),
+('Flour - Semolina', 10000.0, 0.4, 'gram', 'dry'),
+('Flour - Wheat', 0.0, 0.119, 'gram', 'dry'),
+('Food Color - Egg Yellow', 330.0, 0.055, 'ml', 'wet'),
+('Food Color - Egg Yellow, Powdered', 0.0, 0.21, 'gram', 'dry'),
+('Food Color - Red', 950.0, 0.055, 'ml', 'wet'),
+('Food Color - Yellow', 0.0, 0.055, 'ml', 'wet'),
+('Fresh Coconut', 0.0, 50.0, 'piece', 'fresh'),
+('Fries - Shoestring', 26000.0, 0.225, 'gram', 'rtc'),
+('Fries - Twister / Loop', 31500.0, 0.312, 'gram', 'rtc'),
+('Frozen Tart Shell - Mini', 0.0, 7.0, 'piece', 'dry'),
+('Frozen Tart Shell - Regular', 0.0, 14.0, 'piece', 'dry'),
+('Fructose', 0.0, 0.17, 'ml', 'wet'),
+('Gabi - Fresh', 0.0, 0.31, 'gram', 'fresh'),
+('Garam Masala - Powdered', 300.0, 0.81, 'gram', 'dry'),
+('Garbanzos - Canned', 0.0, 0.12222222222222222, 'gram', 'wet'),
+('Garlic - Fresh', 0.0, 0.18, 'gram', 'dry'),
+('Garlic - Powder', 615.0, 0.882, 'gram', 'dry'),
+('Garlic Longganisa', 27100.0, 0.37, 'gram', 'pork'),
+('Gelatin Powder', 200.0, 5.0, 'gram', 'dry'),
+('Gin - Tanqueray', 3000.0, 1.2386666666666666, 'ml', 'beverage'),
+('Gin - Zafiro', 19000.0, 0.339, 'ml', 'beverage'),
+('Ginger - Fresh', 0.0, 0.18, 'gram', 'fresh'),
+('Glucose', 1500.0, 0.47333333333333333, 'ml', 'wet'),
+('Glutinous Rice (Malagkit)', 0.0, 0.075, 'gram', 'dry'),
+('Gran Marnier 700 ml', 700.0, 2.47, 'ml', 'beverage'),
+('Grapes - Green, Seedless', 0.0, 0.82, 'gram', 'fresh'),
+('Green Peas - Canned', 0.0, 0.106, 'gram', 'wet'),
+('Green Peas - Frozen', 0.0, 0.117, 'gram', 'rtc'),
+('Grenadine Syrup', 3000.0, 0.459, 'ml', 'wet'),
+('Havana Club White Rum 700ml', 4900.0, 0.719, 'ml', 'beverage'),
+('Hazelnut Praline Paste', 0.0, 1.5, 'gram', 'wet'),
+('Hoegaarden Regular 500 ml', 0.0, 0.256, 'can', 'beverage'),
+('Hoegaarden Rose 500 ml', 0.0, 0.194, 'can', 'beverage'),
+('Hoisin Sauce', 1117.0, 0.484, 'ml', 'wet'),
+('Honey', 0.0, 0.52, 'ml', 'wet'),
+('Hotdog, Tender Juicy', 2000.0, 0.235, 'gram', 'rtc'),
+('Ice Cream - Vanilla, Selecta', 0.0, 0.305, 'ml', 'wet'),
+('Instant Coffee Ground', 340.0, 1.224, 'gram', 'dry'),
+('Instant Dry Yeast', 750.0, 0.46, 'gram', 'dry'),
+('Inutak - Small', 0.0, 200.0, 'pack', 'rtc'),
+('Italian Seasoning - Dried', 0.0, 2.46, 'gram', 'd'),
+('Jose Cuervo Tequila 1 Liter', 0.0, 1.079, 'ml', 'beverage'),
+('Kahlua Coffee Liqueur 700 ml', 2800.0, 0.915, 'ml', 'beverage'),
+('Kangkong', 0.0, 0.12, 'gram', 'fresh'),
+('Kaong - Plain', 12000.0, 0.23, 'jar', 'wet'),
+('Kikiam', 0.0, 0.28, 'pack', 'rtc'),
+('Knorr Chicken Powder', 6000.0, 0.547, 'gram', 'dry'),
+('Knorr Crab and Corn 55g', 1870.0, 1.1272727272727272, 'gram', 'dry'),
+('Knorr Demi Glace Powder', 1000.0, 1.378, 'gram', 'dry'),
+('Lady Finger', 800.0, 0.95, 'gram', 'dry'),
+('Large White Marshmallows', 0.0, 0.4, 'gram', 'dry'),
+('Lea & Perrins Worcestershire Sauce', 1773.0, 0.733, 'ml', 'wet'),
+('Leche Flan', 0.0, 185.0, 'pack', 'rtc'),
+('Lemon - Dried, Sliced', 0.0, 1.0, 'gram', 'dry'),
+('Lemon - Fresh', 0.0, 45.0, 'piece', 'fresh'),
+('Lemon Grass Powder', 1000.0, 0.388, 'gram', 'dry'),
+('Lemongrass - Fresh', 0.0, 0.125, 'gram', 'dry'),
+('Lettuce - Green', 0.0, 0.21, 'gram', 'fresh'),
+('Liquid Seasoning', 7580.0, 0.09, 'ml', 'wet'),
+('Liquid Smoke', 0.0, 3.088, 'ml', 'wet'),
+('Loaf Bread per pack', 0.0, 100.0, 'pack', 'gram'),
+('Lumpia - Shanghai (12 pcs /pack, per piece)', 504.0, 14.0, 'piece', 'rtc'),
+('Lumpia - Siomai (12 pcs /pack, per piece)', 792.0, 14.0, 'piece', 'rtc'),
+('Lychee - Canned', 690.0, 0.264, 'gram', 'wet'),
+('Macapuno per gram', 18000.0, 0.23, 'jar', 'wet'),
+('Magic Sarap', 1600.0, 0.547, 'gram', 'dry'),
+('Malunggay Leaves - Fresh', 0.0, 0.21, 'gram', 'dry'),
+('Mama Sitas Barbeque Marinade Mix', 1360.0, 0.185, 'gram', 'wet'),
+('Mama Sitas Stir Fry Mix', 0.0, 1.45, 'gram', 'dry'),
+('Mang Tomas Liver Sauce', 8000.0, 0.119, 'ml', 'wet'),
+('Mango - Fresh', 0.0, 0.16, 'gram', 'fresh'),
+('Mango - Frozen', 55000.0, 0.33, 'gram', 'frozen'),
+('Mango Salsa 750gms', 45750.0, 0.519, 'gram', 'wet'),
+('Maple Cured Ham', 3280.0, 0.69, 'gram', 'meat'),
+('Maple Syrup', 0.0, 0.3, 'ml', 'wet'),
+('Maraschino Cherry', 0.0, 0.678, 'gram', 'dry'),
+('Martini Extra Dry Vermouth 1 Liter', 2000.0, 0.818, 'ml', 'beverage'),
+('Martini Rosso Vermouth 1 Liter', 2000.0, 0.99, 'ml', 'beverage'),
+('Matcha Powder', 2000.0, 0.365, 'gram', 'dry'),
+('Mayonnaise - Japanese', 0.0, 0.645, 'ml', 'wet'),
+('Mayonnaise - Regular', 5500.0, 0.315, 'ml', 'wet'),
+('Milk - Condensed 300ml per ml', 24882.0, 0.25, 'ml', 'wet'),
+('Milk - Condensed Ube Flavor 300ml per ml', 0.0, 0.17, 'ml', 'wet'),
+('Milk - Evaporated 370ml per ml', 19800.0, 0.176, 'ml', 'wet'),
+('Milk - Full Cream / Fresh Milk', 72000.0, 0.095, 'ml', 'wet'),
+('Milk - Powdered', 5700.0, 0.308, 'gram', 'dry'),
+('Mineral Water 500ml', 365.0, 15.0, 'bottle', 'beverage'),
+('Mint - Fresh', 0.0, 0.55, 'gram', 'fresh'),
+('Miso Paste', 3950.0, 0.24, 'gram', 'wet'),
+('Misua - Dried', 0.0, 0.225, 'gram', 'dry'),
+('Mixed Vegetables - Frozen', 10000.0, 0.275, 'gram', 'rtc'),
+('Monggo / Mung Beans', 0.0, 0.26, 'gram', 'fresh'),
+('Munggo - Bottled (per gram)', 17000.0, 0.23, 'gram', 'wet'),
+('Muscovado Sugar', 3000.0, 0.187, 'gram', 'dry'),
+('Mushroom - Canned, Sliced', 4000.0, 0.268, 'gram', 'wet'),
+('Mushroom - Canned, Whole', 800.0, 0.186, 'gram', 'wet'),
+('Mushroom - Fresh, White Button', 0.0, 1.26, 'gram', 'fresh'),
+('Mushroom - Shitake, Dried', 0.0, 1.01, 'gram', 'dry'),
+('Mushroom - Shitake, Fresh', 0.0, 0.765, 'gram', 'fresh'),
+('Mushroom - Tengga Daga', 0.0, 1.01, 'gram', 'dry'),
+('Mustard Leaves - Mustasa', 0.0, 0.239, 'gram', 'fresh'),
+('Nacho Chips', 0.0, 0.305, 'gram', 'dry'),
+('Nata de Coco - Bottled (per gram)', 13000.0, 0.185, 'gram', 'wet'),
+('Nestea - Restaurant Blend', 0.0, 1.05, 'gram', 'dry'),
+('Nestea Apple Powdered Juice 25 g', 0.0, 1.16, 'gram', 'dry'),
+('Nestea Cranberry Powdered Juice 25 g', 0.0, 1.16, 'gram', 'dry'),
+('Nestea Lemon Juice - Powdered', 750.0, 1.0, 'gram', 'dry'),
+('Nestea Lemonade Cucumber - Powdered', 1680.0, 0.645, 'gram', 'dry'),
+('New York Cheesecake - Whole', 0.0, 1350.0, 'piece', 'dessert'),
+('Nilupak (per pack)', 0.0, 175.0, 'pack', 'rtc'),
+('Niyog - Whole', 0.0, 55.0, 'piece', 'fresh'),
+('Noodles - Bihon/Palabok', 0.0, 0.11, 'gram', 'dry'),
+('Noodles - Canton', 0.0, 0.17, 'gram', 'dry'),
+('Noodles - Miki', 0.0, 0.12, 'gram', 'wet'),
+('Noodles - Vermicelli / Sotanghon', 6000.0, 0.189, 'gram', 'dry'),
+('Nori Seaweed (small)', 0.0, 5.37, 'gram', 'dry'),
+('Nutmeg - Ground', 0.0, 4.351, 'gram', 'dry'),
+('Oil - Extra Virgin Olive', 0.0, 0.8, 'ml', 'wet'),
+('Oil - Olive', 5000.0, 0.74, 'ml', 'wet'),
+('Oil - Sesame', 820.0, 0.55, 'ml', 'wet'),
+('Oil - Sunflower', 0.0, 2.2, 'ml', 'wet'),
+('Oil - Truffle', 3750.0, 3.42, 'ml', 'wet'),
+('Oil - Vegetable (Cooking)', 234000.0, 0.106, 'ml', 'wet'),
+('Okra', 0.0, 0.15, 'gram', 'fresh'),
+('Olives - Green, Pitted', 2100.0, 0.776, 'ml', 'wet'),
+('Onion - Pearl, Pickled', 0.0, 1.05, 'gram', 'wet'),
+('Onion - Red', 0.0, 0.2, 'gram', 'fresh'),
+('Onion - White', 0.0, 0.18, 'gram', 'fresh'),
+('Onion Leeks', 0.0, 0.18, 'gram', 'fresh'),
+('Onion Powder', 540.0, 0.86, 'gram', 'dry'),
+('Orange - Dried, Sliced', 0.0, 1.2, 'gram', 'dry'),
+('Orange - Fresh', 0.0, 55.0, 'piece', 'fresh'),
+('Oregano - Fresh', 0.0, 0.35, 'gram', 'fresh'),
+('Oregano Leaves - Dried', 1000.0, 1.438, 'gram', 'dry'),
+('Oregano Leaves - Ground', 0.0, 2.55, 'gram', 'dry'),
+('Ox Tripe', 15080.0, 0.2, 'gram', 'beef'),
+('Oyster Sauce', 4054.0, 0.095, 'ml', 'wet'),
+('Pampano - Frozen', 30000.0, 0.285, 'gram', 'seafood'),
+('Papaya -Fresh', 0.0, 0.2, 'gram', 'fresh'),
+('Paprika - Smoked', 0.0, 1.0, 'gram', 'dry'),
+('Paprika - Spanish', 1200.0, 2.568, 'gram', 'dry'),
+('Parsley - Dried', 0.0, 4.15, 'gram', 'dry'),
+('Parsley - Fresh, Curly', 0.0, 0.6, 'gram', 'fresh'),
+('Pasta - Fettucine', 0.0, 0.178, 'gram', 'dry'),
+('Pasta - Fusili', 3000.0, 0.178, 'gram', 'dry'),
+('Pasta - Lasagna', 5000.0, 0.318, 'gram', 'dry'),
+('Pasta - Linguine', 12500.0, 0.3, 'gram', 'dry'),
+('Pasta - Macaroni', 0.0, 0.141, 'gram', 'dry'),
+('Pasta - Penne Rigate', 0.0, 0.189, 'gram', 'dry'),
+('Pasta - Spaghetti', 0.0, 0.085, 'gram', 'dry'),
+('Peanut - Raw', 0.0, 0.2, 'gram', 'dry'),
+('Peanut Butter', 35032.0, 0.345, 'gram', 'wet'),
+('Petchay - Baguio', 0.0, 0.08, 'gram', 'fresh'),
+('Petchay - Tagalog', 0.0, 0.08, 'gram', 'fresh'),
+('Pichi Pichi - Big (per box)', 0.0, 385.0, 'box', 'rtc'),
+('Pickle - Relish', 0.0, 0.46, 'ml', 'wet'),
+('Pickle - Whole', 0.0, 0.441, 'gram', 'wet'),
+('Pineapple - Chunks', 822.0, 0.204, 'gram', 'wet'),
+('Pineapple - Fresh', 0.0, 0.18, 'gram', 'fresh'),
+('Pineapple - Juice, per ml', 5000.0, 0.132, 'ml', 'wet'),
+('Pineapple - Slices', 822.0, 0.312, 'gram', 'wet'),
+('Pineapple Juice - 240ml (per can)', 0.0, 40.0, 'can', 'beverage'),
+('Pinipig - Raw', 0.0, 0.11, 'gram', 'dry'),
+('Pistachio Paste', 0.0, 1.55, 'ml', 'dry'),
+('Pixie Luster Duster', 110.0, 12.3, 'gram', 'dry'),
+('Popcorn - Raw', 0.0, 0.075, 'gram', 'dry'),
+('Pork - Belly - BISO', 149701.0, 0.43, 'gram', 'pork'),
+('Pork - Belly - BLSL', 5530.0, 0.43, 'gram', 'pork'),
+('Pork - Belly - Sliced', 0.0, 0.43, 'gram', 'pork'),
+('Pork - Bulaklak', 0.0, 0.15, 'gram', 'pork'),
+('Pork - Chops', 0.0, 0.32, 'gram', 'pork'),
+('Pork - Fats', 0.0, 0.22, 'gram', 'pork'),
+('Pork - Ground', 0.0, 0.275, 'gram', 'pork'),
+('Pork - Jowls', 0.0, 0.28, 'gram', 'pork'),
+('Pork - Kasim / Shoulder', 8370.0, 0.28, 'gram', 'pork'),
+('Pork - Liver', 0.0, 0.3, 'gram', 'pork'),
+('Pork - Pata Front', 0.0, 0.225, 'gram', 'pork'),
+('Pork - Smoked Bacon', 6000.0, 0.767, 'gram', 'pork'),
+('Pork - Thick - Bacon Picnic', 5215.0, 1.014, 'gram', 'pork'),
+('Potato - Fresh', 0.0, 0.14, 'gram', 'fresh'),
+('Potato Starch', 0.0, 0.443, 'gram', 'dry'),
+("Powdered / Confectioner's Sugar", 6000.0, 0.296, 'gram', 'dry'),
+('Proseco 750 ml', 3000.0, 1.079, 'ml', 'beverage'),
+('Puff Pastry Sheet (pack of 5 sheets)', 0.0, 1125.0, 'pack', 'dry'),
+('Puratos - Fudgy Brownie Mix (per gram)', 0.0, 0.53, 'gram', 'dry'),
+('Puratos - Red Velvet Cake Mix 1kg (per gram)', 11000.0, 0.53, 'gram', 'dry'),
+('Puratos - Tegral Vanilla Sponge (per gram)', 0.0, 0.53, 'gram', 'dry'),
+('Puratos - Ube Cake Mix (per gram)', 2000.0, 0.53, 'gram', 'dry'),
+('Puratos- Chocolate Cake Mix (per gram)', 7000.0, 0.53, 'gram', 'dry'),
+('Quail Egg', 0.0, 4.0, 'piece', 'chicken'),
+('Raddish - Fresh', 0.0, 0.08, 'gram', 'fresh'),
+('Raisins', 0.0, 0.565, 'gram', 'dry'),
+('Red Ice Tea - Powdered', 0.0, 0.84, 'gram', 'dry'),
+('Reno Liver Spread', 4830.0, 0.296, 'ml', 'wet'),
+('Rice - Arborio', 1000.0, 1.02, 'gram', 'dry'),
+('Rice - White', 10000.0, 0.068, 'gram', 'dry'),
+('Rice Wine', 0.0, 0.24, 'ml', 'wet'),
+('Rite n Lite - Cucumber', 0.0, 35.0, 'piece', 'beverage'),
+('Rootbeer (per ml)', 0.0, 0.5, 'ml', 'wet'),
+('Rosemary Leaves - Dried', 0.0, 1.779, 'gram', 'dry'),
+('Sago - Bottled (per gram)', 9000.0, 0.13, 'gram', 'wet'),
+('Salmon - Frozen Slab', 15100.0, 1.0, 'gram', 'seafood'),
+('Salt - Iodized', 3000.0, 0.04, 'gram', 'dry'),
+('Salt - Rock', 0.0, 0.055, 'gram', 'dry'),
+('San Miguel Light 330 ml', 48.0, 60.0, 'can', 'beverage'),
+('San Miguel Pale Pilsen 330 ml', 96.0, 60.0, 'can', 'beverage'),
+('Sausage - Cocktail Hungarian', 11440.0, 0.59, 'gram', 'pork'),
+('Sayote - Fresh', 0.0, 0.08, 'gram', 'fresh'),
+('Sesame Seeds', 0.0, 0.025, 'gram', 'dry'),
+('Sesame Seeds - Black', 120.0, 0.39, 'gram', 'dry'),
+('Shotts - Passion Fruit', 0.0, 0.91, 'ml', 'beverage'),
+('Shotts - Rose', 0.0, 0.91, 'ml', 'beverage'),
+('Shotts - Black Tea & Peach', 5000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Butterscotch', 4000.0, 0.71, 'ml', 'beverage'),
+('Shotts - Cane Sugar', 0.0, 0.71, 'ml', 'beverage'),
+('Shotts - Caramel', 4000.0, 0.71, 'ml', 'beverage'),
+('Shotts - Dark Chocolate', 0.0, 0.71, 'ml', 'beverage'),
+('Shotts - Flamed Orange', 3000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Hazelnut', 4000.0, 0.71, 'ml', 'beverage'),
+('Shotts - Irish Cream', 0.0, 0.71, 'ml', 'beverage'),
+('Shotts - Lemon Ginger & Honey', 7000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Lychee', 4000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Macadamia', 4000.0, 0.71, 'ml', 'beverage'),
+('Shotts - Salted Caramel', 4000.0, 0.71, 'ml', 'beverage'),
+('Shotts - Sticky Strawberry', 13000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Strawberry', 0.0, 0.91, 'ml', 'beverage'),
+('Shotts - Tahitian Lime', 5000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Triple Peach', 3000.0, 0.91, 'ml', 'beverage'),
+('Shotts - Vanilla', 5000.0, 0.91, 'ml', 'beverage'),
+('Shotts - White Chocolate', 4000.0, 0.71, 'ml', 'beverage'),
+('Shrimp - Fresh, Whole', 0.0, 0.55, 'gram', 'seafood'),
+('Shrimp - Peeled, Frozen', 19000.0, 0.48, 'gram', 'seafood'),
+('Shrimp Paste', 370.0, 0.767, 'gram', 'wet'),
+('Sinamak 750 ml', 0.0, 0.267, 'ml', 'wet'),
+('Singkamas', 0.0, 0.07, 'gram', 'fresh'),
+('Sinigang Mix - Gabi', 3300.0, 0.796, 'gram', 'dry'),
+('Sinigang Mix - Miso', 1564.0, 1.087, 'gram', 'dry'),
+('Sinigang Mix - Original', 0.0, 1.091, 'gram', 'dry'),
+('Sitaw', 0.0, 0.13, 'gram', 'fresh'),
+('Sitsaro', 0.0, 0.28, 'gram', 'fresh'),
+('Sliced Cheese per gram', 0.0, 1.0, 'gram', 'rtc'),
+('Sliced Jalapenos', 335.0, 0.465, 'gram', 'wet'),
+('Smirnoff Vodka 700ml', 700.0, 1.212, 'ml', 'beverage'),
+('Soda Water 320 ml (per ml)', 3200.0, 0.125, 'ml', 'beverage'),
+('Soy Sauce - Dark', 4500.0, 0.186, 'ml', 'wet'),
+('Soy Sauce - Kikkoman', 5000.0, 0.292, 'ml', 'wet'),
+('Soy Sauce - Regular', 15600.0, 0.105, 'ml', 'wet'),
+('Spaghetti Sauce - Filipino Style', 0.0, 0.13, 'ml', 'wet'),
+('Spam Regular 340 g (per gram)', 2040.0, 0.671, 'gram', 'rtc'),
+('Spring Onion', 0.0, 0.61, 'gram', 'fresh'),
+('Sprite 320 ml', 72.0, 37.0, 'can', 'beverage'),
+('Squash', 0.0, 0.08, 'gram', 'fresh'),
+('Sriracha', 0.0, 0.655, 'ml', 'wet'),
+('Star Anise', 100.0, 1.79, 'gram', 'dry'),
+('Star Margarine', 1000.0, 0.36, 'gram', 'wet'),
+('Strawberry - Fruit Jam', 0.0, 0.5, 'ml', 'wet'),
+('Strawberry Syrup - Dionysus', 0.0, 1.07, 'ml', 'wet'),
+('Sugar - Brown', 30000.0, 0.11, 'gram', 'dry'),
+('Sugar - Pearl', 0.0, 0.505, 'gram', 'wet'),
+('Sugar - White', 25000.0, 0.138, 'gram', 'dry'),
+('Sweet & Chili Dipping Sauce', 5520.0, 0.261, 'ml', 'wet'),
+('Sweet & Sour Sauce', 4140.0, 0.384, 'ml', 'wet'),
+('Sweet Basil - Fresh', 0.0, 0.65, 'gram', 'fresh'),
+('Sweet Corn - Fresh', 0.0, 0.07, 'gram', 'fresh'),
+('Sweet Potato', 0.0, 0.09, 'gram', 'fresh'),
+('Tabasco Sauce', 240.0, 1.886, 'ml', 'wet'),
+('Tamarind  Paste', 908.0, 0.33, 'gram', 'wet'),
+('Tanduay Rum - 1 Liter (per ml)', 0.0, 0.24, 'ml', 'beverage'),
+('Tang Orange Powdered Juice 19g (per gram)', 375.0, 0.95, 'gram', 'dry'),
+('Tanglad / Lemongrass - Fresh', 0.0, 0.25, 'gram', 'fresh'),
+('Tapioca Pearl, Small, Raw', 0.0, 0.15, 'gram', 'dry'),
+('Taro/Gabi', 0.0, 0.31, 'gram', 'fresh'),
+('Tea - Chamomile', 0.0, 1.15, 'gram', 'dry'),
+('Tea - Green Jasmine', 200.0, 1.05, 'gram', 'dry'),
+('Tea - Hibiscus', 200.0, 2.05, 'gram', 'dry'),
+('Teriyaki Sauce', 0.0, 0.27, 'ml', 'wet'),
+('Thyme Leaves - Dried', 500.0, 1.572, 'gram', 'dry'),
+('Tokwa - Fresh', 0.0, 0.135, 'gram', 'fresh'),
+('Tomato Ketchup', 29931.0, 0.199, 'ml', 'wet'),
+('Tomato Paste', 0.0, 0.3, 'gram', 'wet'),
+('Tomato Sauce - Filipino Style', 0.0, 0.13, 'ml', 'wet'),
+('Tomatoes - Canned, Diced', 0.0, 0.25, 'gram', 'wet'),
+('Tomatoes - Canned, Whole peeled', 0.0, 0.177, 'gram', 'wet'),
+('Tomatoes - Fresh', 0.0, 0.12, 'gram', 'fresh'),
+('Tomatoes - Sundried', 0.0, 1.347, 'gram', 'wet'),
+('Tonic Water 320 ml', 0.0, 45.0, 'can', 'beverage'),
+('Torani White Chocolate Sauce 1.89 Liter (per ml)', 0.0, 0.847, 'ml', 'wet'),
+('Triple Sec 1 Liter', 0.0, 0.5, 'ml', 'beverage'),
+('Tuna - Belly, Frozen', 77610.0, 0.5, 'gram', 'seafood'),
+('Tuna - Yellow Fin, Fresh', 0.0, 0.35, 'gram', 'seafood'),
+('Tuna Flakes In Oil 170g per gram', 170.0, 0.235, 'gram', 'wet'),
+('Turmeric - Ground', 0.0, 0.65, 'gram', 'dry'),
+('Ube - Don Benitos (per pack)', 0.0, 220.0, 'pack', 'rtc'),
+('Ube Extract', 2400.0, 1.723, 'ml', 'wet'),
+('Ube Powder', 0.0, 0.45, 'gram', 'dry'),
+('Ube Syrup - Dionysus', 0.0, 2.312, 'ml', 'wet'),
+('Vanilla Extract', 1425.0, 1.053, 'ml', 'wet'),
+('Vanilla Powder', 0.0, 0.355, 'gram', 'dry'),
+('Vetsin', 1000.0, 0.25, 'gram', 'dry'),
+('Vinegar - Apple Cider', 0.0, 0.529, 'ml', 'wet'),
+('Vinegar - Balsamic', 0.0, 0.5, 'ml', 'wet'),
+('Vinegar - Cane', 3785.0, 0.053, 'ml', 'wet'),
+('Vinegar - Red Wine', 0.0, 1.2, 'ml', 'wet'),
+('Vinegar - White', 3785.0, 0.05, 'ml', 'wet'),
+('Walnuts - Whole, Raw', 1000.0, 0.8, 'gram', 'dry'),
+('Wansoy/Cilantro - Fresh', 0.0, 0.46, 'gram', 'fresh'),
+('Watermelon - Fresh', 0.0, 0.06, 'gram', 'fresh'),
+('Whipped Topping - Ambiante', 2000.0, 0.32, 'pack', 'wet'),
+('Whipped Topping - Everwhip', 0.0, 0.25, 'ml', 'wet'),
+('Whiskey - Andy Player', 0.0, 0.52, 'ml', 'beverage'),
+('Whiskey - Irishman', 700.0, 3.358, 'ml', 'beverage'),
+('Whiskey - Jack Daniel', 7000.0, 2.1, 'ml', 'beverage'),
+('Whiskey - Jim Beam', 3000.0, 1.35, 'ml', 'beverage'),
+('Whiskey - Johnny Walker', 0.0, 1.65, 'ml', 'beverage'),
+('White Chocolate - Bar', 0.0, 0.39, 'gram', 'dry'),
+('White Chocolate - Droplets', 0.0, 0.37, 'gram', 'dry'),
+('White Pepper - Ground', 0.0, 0.39, 'gram', 'dry'),
+('White Rum 700 ml', 0.0, 1.439, 'ml', 'beverage'),
+('White Sugar (Sachet) - 100pcs (per piece)', 500.0, 2.0, 'piece', 'beverage'),
+('Wine - Red - 750 ml', 22.0, 555.0, 'bottle', 'beverage'),
+('Wine - Rose - 750ml', 18.0, 555.0, 'bottle', 'beverage'),
+('Wine - Sangria', 4.0, 1350.0, 'ml', 'beverage'),
+('Wine - White 750 ml', 11.0, 450.0, 'bottle', 'beverage'),
+('Young Corn - Canned', 0.0, 0.3, 'gram', 'wet'),
+('Mussels - Frozen', 3000.0, 0.25, 'gram', 'frozen'),
+('Squid - Frozen', 0.0, 0.38, 'gram', 'frozen'),
+('Bukchoy - Fresh', 0.0, 0.22, 'gram', 'fresh'),
+('Johnny Walker Black Label (per bottle)', 5.0, 1200.0, 'bottle', 'beverage'),
+('Molo Wrapper', 840.0, 0.19, 'gram', 'fresh'),
+('Gochujang Paste', 0.0, 0.824, 'gram', 'wet'),
+('Cassava Cake', 0.0, 170.0, 'pack', 'gram'),
+('Suman (per gram)', 0.0, 0.15, 'gram', 'fresh'),
+('Panutsa', 0.0, 0.08, 'gram', 'dry'),
+('San Miguel Apple', 0.0, 65.0, 'can', 'beverage'),
+('Coconut Rum - Orchid', 0.0, 0.3, 'ml', 'beverage'),
+('Lime Juice - Orchid', 0.0, 0.16, 'ml', 'beverage'),
+('Tequila - El Hombre', 0.0, 0.572, 'ml', 'beverage'),
+('GSM Blue', 0.0, 0.286, 'ml', 'beverage'),
+('Danggit', 3000.0, 1.7, 'gram', 'dry'),
+('Curry Powder', 0.0, 0.32, 'gram', 'dry'),
+('Red Horse', 0.0, 83.0, 'can', 'beverage'),
+('Sweet Ham', 0.0, 0.6, 'gram', 'frozen'),
+('Cheedar Cheese Powder', 0.0, 0.275, 'gram', 'dry'),
+('Barbeque Powder', 0.0, 0.275, 'gram', 'dry'),
+('Kropek', 0.0, 0.9, 'gram', 'dry'),
+('Mixed Cheese', 0.0, 0.6, 'gram', 'dry'),
+('Rosemary Leaves - Fresh', 0.0, 0.75, 'gram', 'fresh'),
+('Graham Crackers', 0.0, 0.3, 'gram', 'dry'),
+('Milk - Coconut', 0.0, 0.185, 'gram', 'dry'),
+('Curing / Pink Salt / Prague Powder', 0.0, 0.12, 'gram', 'dry'),
+('Cloves - Whole', 0.0, 1.265, 'gram', 'dry'),
+('Curry - Green', 0.0, 1.84, 'gram', 'rtc'),
+('Cascina Italian Pesto per gram', 0.0, 0.7481481481481481, 'gram', 'rtc'),
+('Cassava Starch', 0.0, 0.15, 'gram', 'dry'),
+('Corn Syrup', 0.0, 0.472, 'ml', 'rtc'),
+('Food Color - Pink', 0.0, 1.6, 'ml', 'wet'),
+('Food Color - Green', 0.0, 1.6, 'ml', 'wet'),
+('Food Color - Brown', 0.0, 1.6, 'ml', 'wet'),
+('Isomalt', 0.0, 2.864, 'gram', 'dry'),
+('Lemon Extract', 0.0, 1.579, 'ml', 'wet'),
+('Lime - Dried, Sliced', 0.0, 1.94, 'gram', 'dry'),
+('Fruit Cocktail', 0.0, 0.117, 'grams', 'dry'),
+('Gulaman - Buko Pandan', 275.0, 1.2, 'grams', 'dry'),
+('Sour Cream Powder', 0.0, 0.275, 'gram', 'dry'),
+('Coconut Meat - per piece', 0.0, 45.0, 'pcs', 'fresh'),
+('Stevia sweetener - per piece', 500.0, 3.0, 'piece', 'dry'),
+('Sago - Raw', 0.0, 0.22, 'gram', 'dry'),
+('Milk - Soy (Unsweetened)', 0.0, 0.17, 'gram', 'wet'),
+('Dragon Fruit', 0.0, 0.499, 'grams', 'fresh'),
+('Cashew Nuts', 0.0, 0.4, 'gram', 'fresh'),
+('Nata bits- 1000g', 5000.0, 0.36, 'gram', 'wet'),
+('Togue', 0.0, 0.2, 'gram', 'fresh'),
+('Pancake Mix- Maya', 0.0, 0.25, 'gram', 'dry'),
+('Gulaman - Mango', 600.0, 0.64, 'gram', 'dry'),
+('Shotts - Coconut', 0.0, 0.91, 'ml', 'beverage'),
+('Langka', 0.0, 0.085, 'gram', 'dry'),
+('Sampaloc', 0.0, 0.15, 'gram', 'dry'),
+('Masa Picha -Ham & Cheese', 0.0, 95.0, 'piece', 'dry'),
+('Masa Picha -Hawaiian', 0.0, 100.0, 'piece', 'dry'),
+('Masa Picha -All Meat', 0.0, 135.0, 'piece', 'dry'),
+('Ice Candy- Mango', 0.0, 20.0, 'piece', 'frozen'),
+('Shotts- Pink Grape Fruit', 0.0, 0.9, 'ml', 'wet'),
+('Milk- Oatside', 0.0, 0.19, 'ml', 'wet'),
+('Biscoff - Sauce', 0.0, 1.05, 'ml', 'wet'),
+('Caramel -Sauce', 0.0, 0.33, 'ml', 'wet'),
+('Cassava Cups - Cheese', 0.0, 40.0, 'pcs', 'rtc'),
+('Cassava Cups - Corn', 0.0, 40.0, 'pcs', 'rtc'),
+('Cassava Cups - Macapuno', 0.0, 40.0, 'pcs', 'rtc'),
+('Salted Egg Powder', 0.0, 1.65, 'g', 'dry'),
+('TOTAL WORTH OF STOCKS', 0.0, 0.0, '', ''),
+]
+
+# ── Google Sheets ──────────────────────────────────────────────────────────────
 @st.cache_resource
-def get_gsheet_client():
-    creds_dict = dict(st.secrets["gcp_service_account"])
-    creds = Credentials.from_service_account_info(creds_dict, scopes=SCOPES)
+def get_client():
+    creds = Credentials.from_service_account_info(dict(st.secrets["gcp_service_account"]), scopes=SCOPES)
     return gspread.authorize(creds)
 
 def get_spreadsheet():
-    client = get_gsheet_client()
-    return client.open_by_key(SPREADSHEET_ID)
+    return get_client().open_by_key(SPREADSHEET_ID)
 
-def ensure_sheet(spreadsheet, name, headers=None):
-    """Get or create a worksheet by name."""
+def ensure_sheet(ss, name, headers):
     try:
-        ws = spreadsheet.worksheet(name)
+        ws = ss.worksheet(name)
     except gspread.WorksheetNotFound:
-        ws = spreadsheet.add_worksheet(title=name, rows=2000, cols=30)
-        if headers:
-            ws.append_row(headers)
+        ws = ss.add_worksheet(title=name, rows=5000, cols=len(headers)+2)
+        ws.append_row(headers)
     return ws
 
-# ── Sheet Names & Headers ──────────────────────────────────────────────────────
-MASTER_SHEET    = "MASTER LIST"
-LOG_SHEET       = "DAILY LOG"
-
-MASTER_HEADERS  = ["ITEM", "UNIT COST", "UNIT OF MEASURE", "CATEGORY", "ACTIVE"]
-LOG_HEADERS     = ["TIMESTAMP", "MONTH", "DATE", "ITEM", "STAFF", "PO NUMBER", "DEPARTMENT",
-                   "ADD'L/IN", "OVER", "DAMAGED/OUT", "CAFÉ", "BAR",
-                   "KITCHEN ALA CARTE", "KITCHEN BANQUET", "RESTO", "NOTES"]
-SUMMARY_HEADERS = ["ITEM", "UNIT COST", "UNIT OF MEASURE", "CATEGORY",
-                   "BEGINNING STOCKS", "ADD'L/IN", "OVER", "DAMAGED/OUT",
-                   "CAFÉ", "BAR", "KITCHEN ALA CARTE", "KITCHEN BANQUET",
-                   "RESTO", "ENDING STOCKS", "TOTAL WORTH OF STOCKS"]
-
-DEPARTMENTS = ["Restaurant", "Cafe", "Bar", "Banquet", "Warehouse / General", "Others"]
-FIELD_TYPES = ["Add'l / In", "Over", "Damaged / Out", "Café", "Bar", "Kitchen Ala Carte", "Kitchen Banquet", "Resto"]
-
-# ── Data helpers ───────────────────────────────────────────────────────────────
-def load_master(spreadsheet):
-    ws = ensure_sheet(spreadsheet, MASTER_SHEET, MASTER_HEADERS)
+@st.cache_data(ttl=30)
+def load_items(_ss_id):
+    ss = get_spreadsheet()
+    ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
     data = ws.get_all_records()
-    return pd.DataFrame(data) if data else pd.DataFrame(columns=MASTER_HEADERS)
+    return pd.DataFrame(data) if data else pd.DataFrame(columns=ITEMS_HEADERS)
 
-def load_log(spreadsheet):
-    ws = ensure_sheet(spreadsheet, LOG_SHEET, LOG_HEADERS)
+@st.cache_data(ttl=30)
+def load_log(_ss_id):
+    ss = get_spreadsheet()
+    ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
     data = ws.get_all_records()
     return pd.DataFrame(data) if data else pd.DataFrame(columns=LOG_HEADERS)
 
-def load_summary(spreadsheet, month_label):
-    sheet_name = f"SUMMARY - {month_label}"
-    ws = ensure_sheet(spreadsheet, sheet_name, SUMMARY_HEADERS)
-    data = ws.get_all_records()
-    return pd.DataFrame(data) if data else pd.DataFrame(columns=SUMMARY_HEADERS), ws
+def invalidate_cache():
+    load_items.clear()
+    load_log.clear()
 
-def month_label(y, m):
-    return datetime(y, m, 1).strftime("%b %Y").upper()
-
-def current_month_label():
-    n = datetime.now()
-    return month_label(n.year, n.month)
-
-def generate_po_number(entry_date, department):
-    """Generate a PO number like PO-20260628-CAFE-001"""
-    dept_code = department.upper().replace(" ", "").replace("/", "")[:4]
-    date_str = entry_date.strftime("%Y%m%d")
-    ts = datetime.now().strftime("%H%M%S")
-    return f"PO-{date_str}-{dept_code}-{ts}"
-
-def update_summary_for_item(spreadsheet, entry_date, selected_item, addin, over, damaged, cafe, bar, kitchen, banquet, resto):
-    """Update summary sheet for a single item's quantities."""
-    month_lbl = entry_date.strftime("%b %Y").upper()
-    sum_sheet = f"SUMMARY - {month_lbl}"
-    try:
-        sum_ws = spreadsheet.worksheet(sum_sheet)
-        records = sum_ws.get_all_records()
-        for idx, rec in enumerate(records):
-            if rec["ITEM"] == selected_item:
-                row_num = idx + 2
-                cols = ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR",
-                        "KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]
-                vals  = [addin, over, damaged, cafe, bar, kitchen, banquet, resto]
-                for col, val in zip(cols, vals):
-                    if val:
-                        cur = float(rec.get(col, 0) or 0)
-                        col_idx = SUMMARY_HEADERS.index(col) + 1
-                        sum_ws.update_cell(row_num, col_idx, cur + val)
-
-                # Recalculate ending & worth
-                updated = sum_ws.row_values(row_num)
-                def gv(i): return float(updated[i-1]) if updated[i-1] else 0
-                ending = gv(5)+gv(6)+gv(7)-gv(8)-gv(9)-gv(10)-gv(11)-gv(12)-gv(13)
-                cost_v = gv(2)
-                sum_ws.update_cell(row_num, 14, round(ending, 4))
-                sum_ws.update_cell(row_num, 15, round(ending * cost_v, 4))
-                break
-    except Exception:
-        pass
-
-def recompute_summary(spreadsheet, month_lbl, master_df, log_df):
-    """Recompute summary for a month from the log and write it back."""
-    sheet_name = f"SUMMARY - {month_lbl}"
-    ws = ensure_sheet(spreadsheet, sheet_name, SUMMARY_HEADERS)
-    ws.clear()
-    ws.append_row(SUMMARY_HEADERS)
-
-    month_log = log_df[log_df["MONTH"] == month_lbl] if not log_df.empty else pd.DataFrame()
-
-    rows = []
-    for _, item in master_df[master_df["ACTIVE"] == "YES"].iterrows():
-        name = item["ITEM"]
-        ilog = month_log[month_log["ITEM"] == name] if not month_log.empty else pd.DataFrame()
-
-        def col_sum(c):
-            if ilog.empty or c not in ilog.columns:
-                return 0
-            vals = pd.to_numeric(ilog[c], errors="coerce").fillna(0)
-            return float(vals.sum())
-
-        addin    = col_sum("ADD'L/IN")
-        over     = col_sum("OVER")
-        damaged  = col_sum("DAMAGED/OUT")
-        cafe     = col_sum("CAFÉ")
-        bar      = col_sum("BAR")
-        kitchen  = col_sum("KITCHEN ALA CARTE")
-        banquet  = col_sum("KITCHEN BANQUET")
-        resto    = col_sum("RESTO")
-
-        begin_key = f"BEGIN_{month_lbl}_{name}"
-        beginning = st.session_state.get(begin_key, 0)
-
-        ending = beginning + addin + over - damaged - cafe - bar - kitchen - banquet - resto
-        cost   = float(item["UNIT COST"]) if item["UNIT COST"] else 0
-        worth  = ending * cost
-
-        rows.append([
-            name, cost, item["UNIT OF MEASURE"], item["CATEGORY"],
-            beginning, addin, over, damaged,
-            cafe, bar, kitchen, banquet, resto,
-            round(ending, 4), round(worth, 4)
-        ])
-
-    if rows:
-        ws.append_rows(rows)
-
-# ── Initialize Master List from existing Excel ─────────────────────────────────
-INITIAL_ITEMS = [["Absolut Vodka Blue",5100.0,0.92,"ml","beverage"],["Accord Powder",0,0.19,"gram","dry"],["Agave Syrup 1.02kg",14280.0,1.088235294117647,"ml","wet"],["Almond - Ground",3000.0,1.08,"gram","dry"],["Amaretto Disaronno 700 ml",5600.0,1.32,"ml","beverage"],["Ampalaya - Fresh",0,0.18,"gram","fresh"],["Ampalaya - Dahon",0,0.41,"gram","fresh"],["Anchovies",448.0,3.3035714285714284,"gram","wet"],["Anisado Wine",0,0.21428571428571427,"ml","wet"],["Aperol 700 ml",4900.0,1.2857142857142858,"ml","beverage"],["Apog Powder",0,3.01,"gram","dry"],["Apple - Red",0,0.16,"gram","fresh"],["Atsuete / Annatto - Seeds",0,0.85,"gram","dry"],["Atsuete / Annatto - Powdered",0,0.33,"gram","dry"],["Bacardi - Gold Rum 750ml",1500.0,0.9333333333333333,"ml","beverage"],["Bacardi - Premium Black 750ml",3000.0,1.1666666666666667,"ml","beverage"],["Bacardi - Superior White 750 ml",1500.0,2.3066666666666666,"ml","beverage"],["Baguio Beans",0,0.18,"gram","fresh"],["Bailey's Original 700 ml",3500.0,1.1428571428571428,"bottle","beverage"],["Baker's Best Margarine 225g",4050.0,0.28,"gram","wet"],["Baking Powder",1000.0,0.22,"gram","dry"],["Baking Soda",4535.0,0.4852941176470588,"gram","dry"],["Balls - Mozarella",0,1.16,"gram","rtc"],["Balls - Shrimp",0,0.215,"gram","rtc"],["Balls - Squid",0,0.297,"gram","rtc"],["Bambi Spring Roll Wrapper - Big 25 pcs",0,10.0,"piece","rtc"],["Bambi Spring Roll Wrapper Small - 35 pcs",0,8.0,"piece","rtc"],["Banana - Lakatan",0,0.14,"gram","fresh"],["Banana - Saba",0,0.08,"gram","fresh"],["Banana - Sweetened, for Halo halo per gram",13000.0,0.19,"gram","fresh"],["Banana Blossom",0,0.57,"gram","dry"],["Banana Essence",0,3.75,"ml","wet"],["Banana Ketchup",0,0.77,"ml","wet"],["Bangus - Daing (pack of 3, per piece)",0,75.0,"piece","seafood"],["Bangus - Smoked Milkfish, Tinapa (420 grams)",9.0,360.0,"piece","seafood"],["Bangus - Unseasoned Fillet - 520 grams",13.0,298.0,"piece","seafood"],["Barbeque Sauce - Ready made",0,2.2,"ml","wet"],["Barrio Fiesta Bagoong Regular",7000.0,0.45,"gram","wet"],["Basil Leaves - Dried",0,1.49,"gram","dry"],["Bay Leaves",0,3.0,"gram","dry"],["Beans - for Halo halo per gram",12000.0,0.24,"gram","wet"],["Beef - Brisket",78670.0,0.48,"gram","beef"],["Beef - Feet",0,0.24,"gram","beef"],["Beef - Ground",5000.0,0.395,"gram","beef"],["Beef - Shank",40120.09,0.43,"gram","beef"],["Beef - Skin",5000.0,0.22,"gram","beef"],["Belgian Waffle Mix",0,0.328,"gram","dry"],["Bell Pepper - Green",0,0.3,"gram","fresh"],["Bell Pepper - Red",0,0.3,"gram","fresh"],["Black Beans",0,0.47,"gram","wet"],["Black Olives - Pitted, Sliced",6075.0,0.6977777777777778,"gram","wet"],["Black Pepper - Ground",1000.0,0.698,"gram","dry"],["Black Pepper - Whole",0,1.2,"gram","dry"],["Blue Curacao 1 liter",2000.0,0.52,"ml","beverage"],["Blue Lemonade Powdered Juice 500g",2000.0,1.175,"gram","beverage"],["Bombay Sapphire Gin 750 ml",1900.0,1.6,"ml","beverage"],["Bread Crumbs - Fine",0,0.18,"gram","dry"],["Bread Crumbs - Japanese",3000.0,0.18,"gram","dry"],["Broccoli",0,0.12,"gram","fresh"],["Broth Cubes - Beef",2220.0,0.75,"gram","rtc"],["Broth Cubes - Chicken",600.0,0.75,"gram","rtc"],["Broth Cubes - Pork",840.0,0.75,"gram","rtc"],["Broth Cubes - Shrimp",2400.0,0.75,"gram","rtc"],["Butter - Unsalted",0,0.3,"gram","rtc"],["Cabbage",0,0.1,"gram","fresh"],["Cabbage - Red",0,0.42,"gram","fresh"],["Cajun Powder",0,1.7875,"gram","wet"],["Calamansi - Concentrate, with Honey",0,0.48,"ml","wet"],["Calamansi - Fresh",0,0.14,"gram","fresh"],["Calamansi - Pure, Unsweetened",1000.0,0.2,"ml","wet"],["Campari Bitter 750 ml",3000.0,1.56,"ml","beverage"],["Canada Dry Ginger Ale 355 ml",36.0,50.0,"can","beverage"],["Canned Tuna",0,0.361,"can","rtc"],["Capers",400.0,0.9614035087719298,"gram","wet"],["Caramel Sauce - Torani",0,0.65,"ml","wet"],["Carrots",0,0.19,"gram","fresh"],["Casa Okinawa Flavor",0,0.43,"gram","dry"],["Cascina Italian Pesto 540 g per bottle",9.0,394.0,"jar","wet"],["Cauliflower",0,0.32,"gram","fresh"],["Cayenne pepper",450.0,2.8846153846153846,"gram","dry"],["Celery",0,0.18,"gram","fresh"],["Cheese - Sauce (500g)",0,0.65,"ml","wet"],["Cheese - Cheddar - Block",10020.0,0.4025,"gram","rtc"],["Cheese - Filled",2700.0,0.31,"gram","rtc"],["Cheese - Mozarella - Block",38890.0,0.5,"gram","rtc"],["Cheese - Parmesan - Ground",10938.0,1.18,"gram","rtc"],["Cheese - Parmesan Block",0,1.66,"gram","rtc"],["Cheese - Quickmelt",3600.0,0.4633333333333333,"gram","rtc"],["Chicken - Breast Fillet",12000.0,0.26,"gram","chicken"],["Chicken - Breast, Bone In",0,0.24,"gram","chicken"],["Chicken - Leg Quarter Bone In",15000.0,0.21,"gram","chicken"],["Chicken - Leg Quarter Fillet Boneless",56000.0,0.335,"gram","chicken"],["Chicken - Liver",6000.0,0.265,"gram","chicken"],["Chicken - Skin",0,0.175,"gram","chicken"],["Chicken - Whole",0,0.235,"gram","chicken"],["Chicken - Wings",0,0.18,"gram","chicken"],["Chili - Flakes",0,0.55,"gram","dry"],["Chili - Green",0,0.25,"gram","fresh"],["Chili - Labuyo",0,0.2,"gram","fresh"],["Chili - Leaves",0,0.12,"gram","dry"],["Chili - Powder",0,0.27,"gram","dry"],["Chorizo - Bilbao",0,1.9857142857142858,"gram","meat"],["Chorizo - Macao",0,0.6363636363636364,"gram","meat"],["Chorizo - Spanish",0,0.65,"gram","meat"],["Cinnamon - Ground",200.0,0.745,"gram","dry"],["Cinnamon Sticks",539.0,1.39,"gram","dry"],["Cloves - Powder",0,2.744186046511628,"gram","dry"],["Cocoa Powder",1000.0,2.331288343558282,"gram","dry"],["Coconut - Shredded",0,55.0,"gram","fresh"],["Coconut Cream per can",8.0,55.0,"can","wet"],["Coconut Rum - Malibu",5600.0,1.0271428571428571,"ml","beverage"],["Coconut Water - Vita Coco",0,0.15151515151515152,"ml","beverage"],["Coffee Beans - Silcafe",0,0.73,"gram","dry"],["Coke 1.5L per ml",0,0.095,"ml","beverage"],["Coke Original 320 ml",50.0,37.0,"can","beverage"],["Coke Zero 320 ml",67.0,37.0,"can","beverage"],["Cooking Sake1 Liter per ml",0,0.23,"ml","wet"],["Coriander Powder",0,0.49,"gram","dry"],["Corn - Kernels, Canned per gram",425.0,0.14285714285714285,"gram","wet"],["Corn - Sweet Style, Canned per gram",425.0,0.18823529411764706,"gram","wet"],["Corn Flakes",0,0.3073770491803279,"gram","dry"],["Cornstarch",0,0.07,"gram","dry"],["Corona Beer 330 ml",144.0,70.0,"bottle","beverage"],["Crab Meat, Frozen",5000.0,1.327,"gram","seafood"],["Crab Paste",908.0,0.8810572687224669,"gram","wet"],["Crab Stick",0,0.329,"gram","seafood"],["Cream - All Purpose, 250ml per ml",12000.0,0.32,"ml","wet"],["Cream - Coconut per ml",57200.0,0.2125,"ml","wet"],["Cream - Cooking",0,0.35,"ml","wet"],["Cream - Full Whipping",0,0.12,"liter","wet"],["Cream - Mascarpone",11000.0,0.89,"ml","wet"],["Cream - Sour",0,0.496,"ml","wet"],["Cream Cheese",1125.0,0.8666666666666667,"gram","rtc"],["Cream Dory - Fillet",3000.0,0.135,"gram","seafood"],["Cream Of Mushroom, Powdered",1550.0,0.8064516129032258,"gram","wet"],["Cream of Tartar",0,0.962,"gram","dry"],["Creamer Sachet (100 pcs, per piece)",500.0,2.0,"piece","dry"],["Crushed Graham",1000.0,0.225,"gram","dry"],["Cucumber - Fresh",0,0.13,"gram","fresh"],["Cumin - Ground",600.0,0.842,"gram","dry"],["Curacao Triple Sec 750 ml",0,0.6,"ml","beverage"],["Custard Powder - Cremyvit",18000.0,0.51,"gram","dry"]]
+def num(val):
+    try: return float(val or 0)
+    except: return 0.0
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("""
-    <div style='background: linear-gradient(175deg, #1A2E1A 0%, #0E1C0E 60%, #080F08 100%);
-                padding: 28px 20px 20px 20px;
-                border-bottom: 1px solid #2A3828;
-                text-align: center;
-                margin-bottom: 8px;'>
-        <div style='font-family: Cormorant Garamond, serif; font-size: 1.6rem; font-weight: 700; color: #8CAF7A; letter-spacing: 2px;'>SERVANDO</div>
-        <div style='font-size: 0.58rem; letter-spacing: 3px; text-transform: uppercase; color: #4A6B3E; margin-top: 6px;'>Inventory System</div>
+    <div style='background:linear-gradient(175deg,#1A2E1A 0%,#0E1C0E 60%,#080F08 100%);
+                padding:24px 20px 18px;border-bottom:1px solid #2A3828;text-align:center;'>
+        <div style='font-family:Cormorant Garamond,serif;font-size:1.5rem;font-weight:700;color:#8CAF7A;letter-spacing:2px;'>SERVANDO</div>
+        <div style='font-size:0.56rem;letter-spacing:3px;text-transform:uppercase;color:#4A6B3E;margin-top:5px;'>Main Warehouse Inventory</div>
     </div>
-    <div style='font-size:0.58rem; font-weight:600; letter-spacing:3px; text-transform:uppercase;
-                color:#4A6B3E; padding: 16px 12px 6px 12px; border-bottom: 1px solid #1E2E1C; margin-bottom: 8px;'>
+    <div style='font-size:0.56rem;font-weight:600;letter-spacing:3px;text-transform:uppercase;
+                color:#4A6B3E;padding:14px 12px 5px;border-bottom:1px solid #1E2E1C;margin-bottom:6px;'>
         Navigation
     </div>
     """, unsafe_allow_html=True)
 
     page = st.radio("", [
-        "📋 Purchase Order",
-        "📦 Ingredients",
-        "📅 Month Manager",
-        "🔍 Search & History",
-        "📊 Summary",
+        "📊 Dashboard",
+        "📥 Deliveries",
+        "📋 Purchase Orders",
+        "🔧 Stock Adjustment",
+        "📆 Monthly Report",
+        "🔍 Item History",
+        "📦 Items Master",
         "⬇️ Export to Excel",
-        "⚙️ Setup"
+        "⚙️ Setup",
     ], label_visibility="collapsed")
 
     st.markdown("---")
-    st.markdown(f"<div style='font-size:0.65rem; letter-spacing:1.5px; text-transform:uppercase; color:#3A5238; padding: 4px 0;'>Today: {date.today().strftime('%B %d, %Y')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='font-size:0.62rem;letter-spacing:1.5px;text-transform:uppercase;color:#3A5238;'>{date.today().strftime('%B %d, %Y')}</div>", unsafe_allow_html=True)
 
-# ── Load data ──────────────────────────────────────────────────────────────────
+# ── Connect ────────────────────────────────────────────────────────────────────
 try:
-    spreadsheet = get_spreadsheet()
-    connected = True
+    ss = get_spreadsheet()
 except Exception as e:
-    connected = False
-    st.error(f"❌ Could not connect to Google Sheets: {e}")
+    st.error(f"❌ Cannot connect to Google Sheets: {e}")
     st.stop()
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: SETUP
+# PAGE: DASHBOARD
 # ══════════════════════════════════════════════════════════════════════════════
-if page == "⚙️ Setup":
-    st.markdown('<div class="main-header"><div><h1>⚙️ Setup</h1><p>Initialize your inventory system</p></div></div>', unsafe_allow_html=True)
+if page == "📊 Dashboard":
+    st.markdown('<div class="main-header"><h1>📊 Dashboard</h1><p>Live stock overview</p></div>', unsafe_allow_html=True)
 
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Initialize Master List from May 2026 Excel</div>', unsafe_allow_html=True)
-    st.write("This will populate the Master List with all 556 items from your existing inventory file. Run this **once** when setting up.")
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
 
-    if st.button("🚀 Import Items from May 2026 Excel", type="primary"):
-        ws = ensure_sheet(spreadsheet, MASTER_SHEET, MASTER_HEADERS)
-        existing = ws.get_all_records()
-        existing_names = {r["ITEM"] for r in existing}
-
-        new_rows = []
-        for row in INITIAL_ITEMS:
-            name = row[0]
-            if name not in existing_names:
-                new_rows.append([name, row[2], row[3], row[4], "YES"])
-
-        if new_rows:
-            ws.append_rows(new_rows)
-            st.success(f"✅ Imported {len(new_rows)} items to Master List!")
-        else:
-            st.info("ℹ️ All items already exist in Master List.")
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Initialize May 2026 Summary (Beginning Stocks)</div>', unsafe_allow_html=True)
-    st.write("This sets up the May 2026 summary with beginning stocks from your Excel file.")
-
-    if st.button("📅 Setup May 2026 Beginning Stocks", type="primary"):
-        master_df = load_master(spreadsheet)
-        log_df = load_log(spreadsheet)
-        sheet_name = "SUMMARY - MAY 2026"
-        ws = ensure_sheet(spreadsheet, sheet_name, SUMMARY_HEADERS)
-        existing = ws.get_all_records()
-        if existing:
-            st.info("May 2026 summary already exists.")
-        else:
-            begin_map = {row[0]: row[1] for row in INITIAL_ITEMS}
-            rows = []
-            for _, item in master_df[master_df["ACTIVE"] == "YES"].iterrows():
-                name = item["ITEM"]
-                beginning = begin_map.get(name, 0)
-                cost = float(item["UNIT COST"]) if item["UNIT COST"] else 0
-                rows.append([name, cost, item["UNIT OF MEASURE"], item["CATEGORY"],
-                              beginning, 0, 0, 0, 0, 0, 0, 0, 0, beginning, beginning * cost])
-            if rows:
-                ws.append_rows(rows)
-                st.success(f"✅ May 2026 initialized with {len(rows)} items!")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: PURCHASE ORDER
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "📋 Purchase Order":
-    st.markdown('<div class="main-header"><div><h1>📋 Purchase Order</h1><p>Build a PO with multiple items, then submit all at once</p></div></div>', unsafe_allow_html=True)
-
-    master_df = load_master(spreadsheet)
-    if master_df.empty:
-        st.warning("⚠️ No ingredients found. Please go to Setup first.")
+    if items_df.empty:
+        st.info("No items yet. Go to ⚙️ Setup to initialize.")
         st.stop()
 
-    active_items = master_df[master_df["ACTIVE"] == "YES"]["ITEM"].tolist()
+    active = items_df[items_df["ACTIVE"] == "YES"].copy()
 
-    # ── Initialize PO cart in session state ──
-    if "po_items" not in st.session_state:
-        st.session_state.po_items = []
+    # Compute current stock per item from log
+    def compute_stock(item_name, beginning):
+        if log_df.empty:
+            return beginning
+        ilog = log_df[log_df["ITEM"] == item_name]
+        if ilog.empty:
+            return beginning
+        add_in   = ilog["ADD_IN"].apply(num).sum()
+        over     = ilog["OVER"].apply(num).sum()
+        rest     = ilog["RESTAURANT"].apply(num).sum()
+        banq     = ilog["BANQUET"].apply(num).sum()
+        cafe     = ilog["CAFE"].apply(num).sum()
+        bar      = ilog["BAR"].apply(num).sum()
+        others   = ilog["OTHERS"].apply(num).sum()
+        spoil    = ilog["SPOILAGE"].apply(num).sum()
+        return beginning + add_in + over - rest - banq - cafe - bar - others - spoil
 
-    # ── PO Header ──────────────────────────────────────────────────────────────
+    active["CURRENT_STOCK"] = active.apply(lambda r: compute_stock(r["ITEM"], num(r["BEGINNING_STOCKS"])), axis=1)
+    active["TOTAL_WORTH"]   = active["CURRENT_STOCK"] * active["UNIT COST"].apply(num)
+
+    total_worth  = active["TOTAL_WORTH"].sum()
+    total_items  = len(active)
+    low_stock    = len(active[active["CURRENT_STOCK"] <= 0])
+    total_txns   = len(log_df) if not log_df.empty else 0
+
+    c1, c2, c3, c4 = st.columns(4)
+    with c1: st.metric("Total Items", total_items)
+    with c2: st.metric("Total Stock Worth", f"₱{total_worth:,.2f}")
+    with c3: st.metric("Zero / Negative Stock", low_stock)
+    with c4: st.metric("Total Transactions", total_txns)
+
+    st.markdown("---")
+
+    # Recent transactions
+    if not log_df.empty:
+        st.markdown('<div class="section-title">Recent Transactions</div>', unsafe_allow_html=True)
+        recent = log_df.sort_values("TIMESTAMP", ascending=False).head(10)
+        for _, row in recent.iterrows():
+            txn = row.get("TXN_TYPE","")
+            ref = row.get("REF_NUMBER","")
+            icon = "📥" if txn == "DELIVERY" else ("📋" if txn == "PO" else "🔧")
+            st.markdown(f"""
+            <div class="log-entry">
+                {icon} <strong>{row.get('ITEM','')}</strong> &nbsp;·&nbsp; {txn} {f'<span style="color:#5A7A52;">({ref})</span>' if ref else ''}
+                &nbsp;·&nbsp; 👤 {row.get('STAFF','')} &nbsp;·&nbsp; 📅 {row.get('DATE','')}
+            </div>""", unsafe_allow_html=True)
+
+    # Low / zero stock warning
+    zero = active[active["CURRENT_STOCK"] <= 0]
+    if not zero.empty:
+        st.markdown('<div class="section-title" style="color:#CC6A6A;">⚠️ Zero or Negative Stock Items</div>', unsafe_allow_html=True)
+        st.dataframe(zero[["ITEM","UNIT OF MEASURE","CATEGORY","CURRENT_STOCK"]].sort_values("ITEM"),
+                     use_container_width=True, hide_index=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: DELIVERIES
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📥 Deliveries":
+    st.markdown('<div class="main-header"><h1>📥 Deliveries</h1><p>Log incoming stock from suppliers</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+
+    if not active_items:
+        st.warning("No items found. Go to Setup first.")
+        st.stop()
+
+    if "delivery_cart" not in st.session_state:
+        st.session_state.delivery_cart = []
+
+    # Header
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Delivery Details</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1: delivery_date = st.date_input("📅 Delivery Date", value=date.today(), key="del_date")
+    with c2: staff_name = st.text_input("👤 Received By", placeholder="Your name", key="del_staff")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Add item
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Add Item to Delivery</div>', unsafe_allow_html=True)
+    search = st.text_input("🔍 Search Item", key="del_search")
+    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
+    c1, c2 = st.columns([3,1])
+    with c1: sel_item = st.selectbox("Select Item", filtered, key="del_item")
+    with c2: qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="del_qty")
+    notes = st.text_input("Notes (optional)", key="del_notes")
+
+    if sel_item:
+        info = items_df[items_df["ITEM"]==sel_item].iloc[0]
+        st.markdown(f'<div class="info-box">📦 <strong>{sel_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+
+    if st.button("➕ Add to Delivery", use_container_width=True):
+        if sel_item and qty > 0:
+            st.session_state.delivery_cart.append({"item": sel_item, "qty": qty, "notes": notes,
+                                                    "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"])})
+            st.success(f"✅ {sel_item} added.")
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Cart
+    if st.session_state.delivery_cart:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">Delivery Cart — {len(st.session_state.delivery_cart)} item(s)</div>', unsafe_allow_html=True)
+        total_val = 0
+        for idx, it in enumerate(st.session_state.delivery_cart):
+            val = it["qty"] * it["cost"]
+            total_val += val
+            col_info, col_del = st.columns([5,1])
+            with col_info:
+                notes_str = f' &nbsp;·&nbsp; {it["notes"]}' if it['notes'] else ''
+                st.markdown(f'<div class="po-item-row"><strong>{idx+1}. {it["item"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{it["qty"]:,.2f} {it["unit"]}</span> &nbsp;|&nbsp; ₱{val:,.2f}{notes_str}</div>', unsafe_allow_html=True)
+            with col_del:
+                if st.button("🗑️", key=f"del_rm_{idx}"):
+                    st.session_state.delivery_cart.pop(idx); st.rerun()
+
+        st.markdown(f'<div class="info-box" style="text-align:right;">Total Delivery Value: <strong>₱{total_val:,.2f}</strong></div>', unsafe_allow_html=True)
+        st.markdown("---")
+        c1, c2 = st.columns([1,2])
+        with c1:
+            if st.button("🗑️ Clear", use_container_width=True):
+                st.session_state.delivery_cart = []; st.rerun()
+        with c2:
+            if st.button("💾 Submit Delivery", type="primary", use_container_width=True):
+                if not staff_name.strip():
+                    st.error("Please enter your name.")
+                else:
+                    ref = f"DEL-{delivery_date.strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+                    log_ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    rows = []
+                    for it in st.session_state.delivery_cart:
+                        rows.append([ts, delivery_date.strftime("%Y-%m-%d"),
+                                     delivery_date.strftime("%b %Y").upper(),
+                                     it["item"], staff_name.strip(), "DELIVERY", ref,
+                                     it["qty"], 0, 0, 0, 0, 0, 0, 0, it["notes"]])
+                    log_ws.append_rows(rows)
+                    invalidate_cache()
+                    n = len(st.session_state.delivery_cart)
+                    st.session_state.delivery_cart = []
+                    st.success(f"✅ Delivery **{ref}** submitted! {n} item(s) logged.")
+                    st.balloons()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: PURCHASE ORDERS
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📋 Purchase Orders":
+    st.markdown('<div class="main-header"><h1>📋 Purchase Orders</h1><p>Release stock to departments</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+
+    if not active_items:
+        st.warning("No items found. Go to Setup first.")
+        st.stop()
+
+    if "po_cart" not in st.session_state:
+        st.session_state.po_cart = []
+
+    # Header
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">PO Details</div>', unsafe_allow_html=True)
-
-    col1, col2, col3 = st.columns(3)
-    with col1:
-        entry_date = st.date_input("📅 Date", value=date.today(), key="po_date")
-    with col2:
-        staff_name = st.text_input("👤 Staff Name", placeholder="Enter your name", key="po_staff")
-    with col3:
-        department_choice = st.selectbox("🏢 Department", DEPARTMENTS, key="po_dept")
-
-    if department_choice == "Others":
-        others_text = st.text_input("✏️ Please specify department", placeholder="e.g. Maintenance, Security...", key="po_others")
-        department = others_text.strip() if others_text.strip() else "Others"
+    c1, c2, c3 = st.columns(3)
+    with c1: po_date = st.date_input("📅 Date", value=date.today(), key="po_date")
+    with c2: po_staff = st.text_input("👤 Prepared By", placeholder="Your name", key="po_staff")
+    with c3:
+        dept_choice = st.selectbox("🏢 Department", DEPARTMENTS + ["Others (Specify)"], key="po_dept")
+    if dept_choice == "Others (Specify)":
+        dept_specify = st.text_input("Specify department", key="po_dept_other")
+        department = dept_specify.strip() if dept_specify.strip() else "Others"
     else:
-        department = department_choice
-
+        department = dept_choice
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── Add Item to PO ─────────────────────────────────────────────────────────
+    # Add item
     st.markdown('<div class="card">', unsafe_allow_html=True)
     st.markdown('<div class="section-title">Add Item to PO</div>', unsafe_allow_html=True)
+    search = st.text_input("🔍 Search Item", key="po_search")
+    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
+    c1, c2 = st.columns([3,1])
+    with c1: po_item = st.selectbox("Select Item", filtered, key="po_item")
+    with c2: po_qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
+    po_notes = st.text_input("Notes (optional)", key="po_notes")
 
-    search_query = st.text_input("🔍 Search Ingredient", placeholder="Type to search... e.g. 'chicken', 'beef'", key="po_search")
-    filtered = [i for i in active_items if search_query.lower() in i.lower()] if search_query else active_items
+    if po_item:
+        info = items_df[items_df["ITEM"]==po_item].iloc[0]
+        st.markdown(f'<div class="info-box">📦 <strong>{po_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
 
-    col_item, col_field, col_qty = st.columns([3, 2, 1])
-    with col_item:
-        selected_item = st.selectbox("Select Ingredient", filtered, key="po_item_select")
-    with col_field:
-        field_type = st.selectbox("Movement Type", FIELD_TYPES, key="po_field_type")
-    with col_qty:
-        quantity = st.number_input("Qty", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
-
-    item_notes = st.text_input("📝 Item Notes (optional)", key="po_item_notes")
-
-    if selected_item:
-        item_info = master_df[master_df["ITEM"] == selected_item].iloc[0]
-        st.markdown(f"""
-        <div class="info-box" style="margin-bottom:0.5rem;">
-            📦 <strong>{selected_item}</strong> &nbsp;|&nbsp;
-            Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
-            Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
-            Category: <strong>{item_info['CATEGORY'].upper()}</strong>
-        </div>
-        """, unsafe_allow_html=True)
-
-    if st.button("➕ Add to PO", type="secondary", use_container_width=True):
-        if not selected_item:
-            st.error("❌ Please select an ingredient.")
-        elif quantity <= 0:
-            st.error("❌ Quantity must be greater than 0.")
-        else:
-            st.session_state.po_items.append({
-                "item": selected_item,
-                "field_type": field_type,
-                "quantity": quantity,
-                "notes": item_notes,
-                "unit": str(item_info["UNIT OF MEASURE"]),
-                "category": str(item_info["CATEGORY"])
-            })
-            st.success(f"✅ **{selected_item}** added to PO.")
+    if st.button("➕ Add to PO", use_container_width=True):
+        if po_item and po_qty > 0:
+            st.session_state.po_cart.append({"item": po_item, "qty": po_qty, "notes": po_notes,
+                                              "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]),
+                                              "dept": department})
+            st.success(f"✅ {po_item} added.")
             st.rerun()
-
     st.markdown('</div>', unsafe_allow_html=True)
 
-    # ── PO Cart / Review ───────────────────────────────────────────────────────
-    if st.session_state.po_items:
+    # Cart
+    if st.session_state.po_cart:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown(f'<div class="section-title">PO Review — {len(st.session_state.po_items)} item(s)</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">PO Review — {len(st.session_state.po_cart)} item(s) → {department}</div>', unsafe_allow_html=True)
+        total_val = 0
+        for idx, it in enumerate(st.session_state.po_cart):
+            val = it["qty"] * it["cost"]
+            total_val += val
+            c_info, c_del = st.columns([5,1])
+            with c_info:
+                notes_str = f' &nbsp;·&nbsp; {it["notes"]}' if it['notes'] else ''
+                st.markdown(f'<div class="po-item-row"><strong>{idx+1}. {it["item"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{it["qty"]:,.2f} {it["unit"]}</span> &nbsp;|&nbsp; ₱{val:,.2f}{notes_str}</div>', unsafe_allow_html=True)
+            with c_del:
+                if st.button("🗑️", key=f"po_rm_{idx}"):
+                    st.session_state.po_cart.pop(idx); st.rerun()
 
-        # Display each item with a remove button
-        for idx, po_item in enumerate(st.session_state.po_items):
-            col_info, col_remove = st.columns([5, 1])
-            with col_info:
-                st.markdown(f"""
-                <div class="po-item-row">
-                    <strong>{idx+1}. {po_item['item']}</strong>
-                    &nbsp;|&nbsp; <span style="color:#0f3460;">{po_item['field_type']}</span>
-                    &nbsp;|&nbsp; <strong>{po_item['quantity']:,.2f} {po_item['unit']}</strong>
-                    {'&nbsp;|&nbsp; 📝 ' + po_item['notes'] if po_item['notes'] else ''}
-                </div>
-                """, unsafe_allow_html=True)
-            with col_remove:
-                if st.button("🗑️", key=f"remove_{idx}", help="Remove this item"):
-                    st.session_state.po_items.pop(idx)
-                    st.rerun()
+        st.markdown(f'<div class="info-box" style="text-align:right;">Total PO Value: <strong>₱{total_val:,.2f}</strong></div>', unsafe_allow_html=True)
+        st.markdown("---")
+        c1, c2 = st.columns([1,2])
+        with c1:
+            if st.button("🗑️ Clear PO", use_container_width=True):
+                st.session_state.po_cart = []; st.rerun()
+        with c2:
+            if st.button("💾 Submit PO", type="primary", use_container_width=True):
+                if not po_staff.strip():
+                    st.error("Please enter your name.")
+                else:
+                    po_ref = f"PO-{po_date.strftime('%Y%m%d')}-{department[:3].upper()}-{datetime.now().strftime('%H%M%S')}"
+                    log_ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    dept_map = {"Restaurant":"RESTAURANT","Banquet":"BANQUET","Café":"CAFE","Bar":"BAR"}
+                    rows = []
+                    for it in st.session_state.po_cart:
+                        dept_col = it["dept"]
+                        r = [ts, po_date.strftime("%Y-%m-%d"), po_date.strftime("%b %Y").upper(),
+                             it["item"], po_staff.strip(), "PO", po_ref,
+                             0, 0, 0, 0, 0, 0, 0, 0, it["notes"]]
+                        # Set the right dept column
+                        dept_indices = {"Restaurant":9,"Banquet":10,"Café":11,"Bar":12}
+                        if dept_col in dept_indices:
+                            r[dept_indices[dept_col]] = it["qty"]
+                        else:
+                            r[13] = it["qty"]  # Others
+                        rows.append(r)
+                    log_ws.append_rows(rows)
+                    invalidate_cache()
+                    n = len(st.session_state.po_cart)
+                    st.session_state.po_cart = []
+                    st.success(f"✅ PO **{po_ref}** submitted! {n} item(s) released to **{department}**.")
+                    st.balloons()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: STOCK ADJUSTMENT
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "🔧 Stock Adjustment":
+    st.markdown('<div class="main-header"><h1>🔧 Stock Adjustment</h1><p>Correct stock levels · Spoilage · Count adjustments</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+
+    if not active_items:
+        st.warning("No items found."); st.stop()
+
+    if "adj_cart" not in st.session_state:
+        st.session_state.adj_cart = []
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Adjustment Details</div>', unsafe_allow_html=True)
+    c1, c2 = st.columns(2)
+    with c1: adj_date = st.date_input("📅 Date", value=date.today(), key="adj_date")
+    with c2: adj_staff = st.text_input("👤 Adjusted By", placeholder="Your name", key="adj_staff")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Add Adjustment</div>', unsafe_allow_html=True)
+    search = st.text_input("🔍 Search Item", key="adj_search")
+    filtered = [i for i in active_items if search.lower() in i.lower()] if search else active_items
+    c1, c2, c3 = st.columns([3,1.5,1])
+    with c1: adj_item = st.selectbox("Select Item", filtered, key="adj_item")
+    with c2:
+        adj_type = st.selectbox("Type", ["Over (Add +)", "Spoilage (Remove −)"], key="adj_type")
+    with c3: adj_qty = st.number_input("Qty", min_value=0.01, step=0.01, format="%.2f", key="adj_qty")
+    adj_notes = st.text_input("Reason (required)", placeholder="e.g. physical count variance, expired goods...", key="adj_notes")
+
+    if adj_item:
+        info = items_df[items_df["ITEM"]==adj_item].iloc[0]
+        st.markdown(f'<div class="info-box">📦 <strong>{adj_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit</div>', unsafe_allow_html=True)
+
+    if st.button("➕ Add Adjustment", use_container_width=True):
+        if not adj_notes.strip():
+            st.error("Please provide a reason for the adjustment.")
+        elif adj_item and adj_qty > 0:
+            st.session_state.adj_cart.append({
+                "item": adj_item, "type": adj_type, "qty": adj_qty,
+                "notes": adj_notes, "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"])
+            })
+            st.success(f"✅ {adj_item} added.")
+            st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.session_state.adj_cart:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        st.markdown(f'<div class="section-title">Adjustments to Submit — {len(st.session_state.adj_cart)} item(s)</div>', unsafe_allow_html=True)
+        for idx, it in enumerate(st.session_state.adj_cart):
+            sign = "➕" if "Over" in it["type"] else "➖"
+            c_i, c_d = st.columns([5,1])
+            with c_i:
+                st.markdown(f'<div class="po-item-row">{sign} <strong>{it["item"]}</strong> &nbsp;|&nbsp; {it["qty"]:,.2f} {it["unit"]} &nbsp;|&nbsp; <span style="color:#5A7A52;">{it["type"]}</span> &nbsp;|&nbsp; {it["notes"]}</div>', unsafe_allow_html=True)
+            with c_d:
+                if st.button("🗑️", key=f"adj_rm_{idx}"):
+                    st.session_state.adj_cart.pop(idx); st.rerun()
 
         st.markdown("---")
-
-        col_clear, col_submit = st.columns([1, 2])
-        with col_clear:
-            if st.button("🗑️ Clear PO", use_container_width=True):
-                st.session_state.po_items = []
-                st.rerun()
-        with col_submit:
-            if st.button("💾 Submit PO", type="primary", use_container_width=True):
-                if not staff_name.strip():
-                    st.error("❌ Please enter your name before submitting.")
+        c1, c2 = st.columns([1,2])
+        with c1:
+            if st.button("🗑️ Clear", use_container_width=True):
+                st.session_state.adj_cart = []; st.rerun()
+        with c2:
+            if st.button("💾 Submit Adjustments", type="primary", use_container_width=True):
+                if not adj_staff.strip():
+                    st.error("Please enter your name.")
                 else:
-                    po_number = generate_po_number(entry_date, department)
-                    log_ws = ensure_sheet(spreadsheet, LOG_SHEET, LOG_HEADERS)
-                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                    month_lbl = entry_date.strftime("%b %Y").upper()
-                    date_str = entry_date.strftime("%Y-%m-%d")
-
-                    rows_to_log = []
-                    for po_item in st.session_state.po_items:
-                        ft = po_item["field_type"]
-                        addin   = po_item["quantity"] if ft == "Add'l / In" else 0
-                        over    = po_item["quantity"] if ft == "Over" else 0
-                        damaged = po_item["quantity"] if ft == "Damaged / Out" else 0
-                        cafe    = po_item["quantity"] if ft == "Café" else 0
-                        bar     = po_item["quantity"] if ft == "Bar" else 0
-                        kitchen = po_item["quantity"] if ft == "Kitchen Ala Carte" else 0
-                        banquet = po_item["quantity"] if ft == "Kitchen Banquet" else 0
-                        resto   = po_item["quantity"] if ft == "Resto" else 0
-
-                        rows_to_log.append([
-                            timestamp, month_lbl, date_str,
-                            po_item["item"], staff_name.strip(),
-                            po_number, department,
-                            addin, over, damaged,
-                            cafe, bar, kitchen, banquet, resto,
-                            po_item["notes"]
-                        ])
-
-                    # Write all rows to log at once
-                    log_ws.append_rows(rows_to_log)
-
-                    # Update summary sheet for each item
-                    for po_item in st.session_state.po_items:
-                        ft = po_item["field_type"]
-                        update_summary_for_item(
-                            spreadsheet, entry_date, po_item["item"],
-                            po_item["quantity"] if ft == "Add'l / In" else 0,
-                            po_item["quantity"] if ft == "Over" else 0,
-                            po_item["quantity"] if ft == "Damaged / Out" else 0,
-                            po_item["quantity"] if ft == "Café" else 0,
-                            po_item["quantity"] if ft == "Bar" else 0,
-                            po_item["quantity"] if ft == "Kitchen Ala Carte" else 0,
-                            po_item["quantity"] if ft == "Kitchen Banquet" else 0,
-                            po_item["quantity"] if ft == "Resto" else 0,
-                        )
-
-                    item_count = len(st.session_state.po_items)
-                    st.session_state.po_items = []
-                    st.success(f"✅ PO **{po_number}** submitted! **{item_count} item(s)** logged by **{staff_name}** for **{department}** on **{entry_date}**.")
+                    ref = f"ADJ-{adj_date.strftime('%Y%m%d')}-{datetime.now().strftime('%H%M%S')}"
+                    log_ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
+                    ts = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    rows = []
+                    for it in st.session_state.adj_cart:
+                        over_qty   = it["qty"] if "Over" in it["type"] else 0
+                        spoil_qty  = it["qty"] if "Spoilage" in it["type"] else 0
+                        rows.append([ts, adj_date.strftime("%Y-%m-%d"),
+                                     adj_date.strftime("%b %Y").upper(),
+                                     it["item"], adj_staff.strip(), "ADJUSTMENT", ref,
+                                     0, over_qty, 0, 0, 0, 0, 0, spoil_qty, it["notes"]])
+                    log_ws.append_rows(rows)
+                    invalidate_cache()
+                    n = len(st.session_state.adj_cart)
+                    st.session_state.adj_cart = []
+                    st.success(f"✅ Adjustment **{ref}** submitted! {n} item(s) updated.")
                     st.balloons()
-
         st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: MONTHLY REPORT
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📆 Monthly Report":
+    st.markdown('<div class="main-header"><h1>📆 Monthly Report</h1><p>Beginning → Deliveries → POs → Adjustments → Ending</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
+
+    if items_df.empty:
+        st.warning("No items yet."); st.stop()
+
+    # Get available months from log
+    if not log_df.empty and "MONTH" in log_df.columns:
+        months = sorted(log_df["MONTH"].dropna().unique().tolist(), reverse=True)
     else:
-        st.info("Your PO is empty. Search and add items above.")
+        months = [date.today().strftime("%b %Y").upper()]
+
+    c1, c2 = st.columns([2,3])
+    with c1:
+        sel_month = st.selectbox("Select Month", months)
+    with c2:
+        cat_filter = st.multiselect("Filter by Category", ["All"] + CATEGORIES, default=["All"])
+
+    # Filter log for month
+    month_log = log_df[log_df["MONTH"] == sel_month] if not log_df.empty else pd.DataFrame()
+
+    # Build summary
+    rows = []
+    active = items_df[items_df["ACTIVE"]=="YES"]
+    for _, item in active.iterrows():
+        name = item["ITEM"]
+        cost = num(item["UNIT COST"])
+        beg  = num(item["BEGINNING_STOCKS"])
+        cat  = item["CATEGORY"]
+
+        if not month_log.empty:
+            ilog = month_log[month_log["ITEM"]==name]
+            add_in  = ilog["ADD_IN"].apply(num).sum()
+            over    = ilog["OVER"].apply(num).sum()
+            rest    = ilog["RESTAURANT"].apply(num).sum()
+            banq    = ilog["BANQUET"].apply(num).sum()
+            cafe    = ilog["CAFE"].apply(num).sum()
+            bar     = ilog["BAR"].apply(num).sum()
+            others  = ilog["OTHERS"].apply(num).sum()
+            spoil   = ilog["SPOILAGE"].apply(num).sum()
+        else:
+            add_in = over = rest = banq = cafe = bar = others = spoil = 0
+
+        ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+        worth  = ending * cost
+
+        rows.append({
+            "ITEM": name, "CATEGORY": cat, "UNIT": item["UNIT OF MEASURE"],
+            "UNIT COST": cost, "BEGINNING": beg,
+            "ADD'L/IN": add_in, "OVER": over,
+            "RESTAURANT": rest, "BANQUET": banq, "CAFÉ": cafe, "BAR": bar,
+            "OTHERS": others, "SPOILAGE": spoil,
+            "ENDING": round(ending,4), "TOTAL WORTH": round(worth,4)
+        })
+
+    df = pd.DataFrame(rows)
+    if "All" not in cat_filter and cat_filter:
+        df = df[df["CATEGORY"].isin(cat_filter)]
+
+    # Metrics
+    total_worth = df["TOTAL WORTH"].sum()
+    c1, c2, c3 = st.columns(3)
+    with c1: st.metric("Month", sel_month)
+    with c2: st.metric("Total Items", len(df))
+    with c3: st.metric("Total Ending Worth", f"₱{total_worth:,.2f}")
+
+    st.markdown("---")
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
-# PAGE: INGREDIENTS
+# PAGE: ITEM HISTORY
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📦 Ingredients":
-    st.markdown('<div class="main-header"><div><h1>📦 Ingredients</h1><p>Manage your master ingredient list</p></div></div>', unsafe_allow_html=True)
+elif page == "🔍 Item History":
+    st.markdown('<div class="main-header"><h1>🔍 Item History</h1><p>Full transaction log per item or per reference number</p></div>', unsafe_allow_html=True)
 
-    master_df = load_master(spreadsheet)
-    CATEGORIES = ["beverage","beef","chicken","pork","seafood","fresh","dry","wet","rtc","meat","frozen","dessert","other"]
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
 
-    tab1, tab2, tab3 = st.tabs(["➕ Add New", "✏️ Edit / Deactivate", "📋 View All"])
+    tab1, tab2 = st.tabs(["🔍 Search by Item", "🧾 Search by Reference (PO / Delivery / Adjustment)"])
+
+    with tab1:
+        search = st.text_input("Search Item", placeholder="Type item name...")
+        if search and not items_df.empty:
+            found = items_df[items_df["ITEM"].str.contains(search, case=False, na=False)]["ITEM"].tolist()
+            if not found:
+                st.warning("No items found.")
+            else:
+                sel = st.selectbox("Select Item", found)
+                if sel and not log_df.empty:
+                    ilog = log_df[log_df["ITEM"]==sel].sort_values("TIMESTAMP", ascending=False)
+                    if ilog.empty:
+                        st.info("No transactions yet for this item.")
+                    else:
+                        info = items_df[items_df["ITEM"]==sel].iloc[0]
+                        st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f} &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+
+                        c1,c2,c3,c4 = st.columns(4)
+                        with c1: st.metric("Total Add'l/In", f'{ilog["ADD_IN"].apply(num).sum():,.2f}')
+                        with c2: st.metric("Total PO Out", f'{(ilog["RESTAURANT"].apply(num)+ilog["BANQUET"].apply(num)+ilog["CAFE"].apply(num)+ilog["BAR"].apply(num)+ilog["OTHERS"].apply(num)).sum():,.2f}')
+                        with c3: st.metric("Total Spoilage", f'{ilog["SPOILAGE"].apply(num).sum():,.2f}')
+                        with c4: st.metric("Transactions", len(ilog))
+
+                        for _, row in ilog.iterrows():
+                            txn = row.get("TXN_TYPE","")
+                            ref = row.get("REF_NUMBER","")
+                            parts = []
+                            for col, label in [("ADD_IN","Add'l/In"),("OVER","Over"),
+                                               ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
+                                               ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
+                                v = num(row.get(col,0))
+                                if v: parts.append(f"{label}: <strong>{v:,.2f}</strong>")
+                            st.markdown(f"""<div class="log-entry">
+                                <strong>{txn}</strong> {f'<span style="color:#5A7A52;">({ref})</span>' if ref else ''} &nbsp;·&nbsp;
+                                👤 {row.get('STAFF','')} &nbsp;·&nbsp; 📅 {row.get('DATE','')}
+                                <div style="margin-top:4px;">{' &nbsp;·&nbsp; '.join(parts) if parts else '—'}</div>
+                                {f'<div style="color:#5A7A52;font-size:0.8rem;">📝 {row.get("NOTES","")}</div>' if row.get("NOTES") else ''}
+                            </div>""", unsafe_allow_html=True)
+
+    with tab2:
+        ref_search = st.text_input("Search Reference #", placeholder="e.g. PO-20260628, DEL-..., ADJ-...")
+        if ref_search and not log_df.empty:
+            rlog = log_df[log_df["REF_NUMBER"].astype(str).str.contains(ref_search, case=False, na=False)]
+            if rlog.empty:
+                st.warning("No records found.")
+            else:
+                for ref in rlog["REF_NUMBER"].unique():
+                    rr = rlog[rlog["REF_NUMBER"]==ref]
+                    first = rr.iloc[0]
+                    st.markdown(f'<div class="info-box">🧾 <strong>{ref}</strong> &nbsp;|&nbsp; {first.get("TXN_TYPE","")} &nbsp;|&nbsp; 📅 {first.get("DATE","")} &nbsp;|&nbsp; 👤 {first.get("STAFF","")} &nbsp;|&nbsp; {len(rr)} item(s)</div>', unsafe_allow_html=True)
+                    for _, row in rr.iterrows():
+                        parts = []
+                        for col, label in [("ADD_IN","Add'l/In"),("OVER","Over"),
+                                           ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
+                                           ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
+                            v = num(row.get(col,0))
+                            if v: parts.append(f"{label}: <strong>{v:,.2f}</strong>")
+                        st.markdown(f"""<div class="log-entry">
+                            📦 <strong>{row.get('ITEM','')}</strong>
+                            <div style="margin-top:3px;">{' &nbsp;·&nbsp; '.join(parts) if parts else '—'}</div>
+                            {f'<div style="color:#5A7A52;font-size:0.8rem;">📝 {row.get("NOTES","")}</div>' if row.get("NOTES") else ''}
+                        </div>""", unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: ITEMS MASTER
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📦 Items Master":
+    st.markdown('<div class="main-header"><h1>📦 Items Master</h1><p>Manage your ingredient list</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    tab1, tab2, tab3 = st.tabs(["➕ Add New Item", "✏️ Edit / Deactivate", "📋 View All"])
 
     with tab1:
         st.markdown('<div class="card">', unsafe_allow_html=True)
-        st.markdown('<div class="section-title">Add New Ingredient</div>', unsafe_allow_html=True)
         c1, c2 = st.columns(2)
         with c1:
             new_name = st.text_input("Item Name *")
-            new_unit = st.text_input("Unit of Measure *", placeholder="gram / ml / piece / bottle / can")
+            new_unit = st.text_input("Unit of Measure *", placeholder="gram / ml / piece / bottle")
         with c2:
             new_cost = st.number_input("Unit Cost (₱) *", min_value=0.0, step=0.0001, format="%.4f")
             new_cat  = st.selectbox("Category *", CATEGORIES)
+        new_begin = st.number_input("Beginning Stock", min_value=0.0, step=0.01, format="%.2f")
 
-        if st.button("➕ Add Ingredient", type="primary"):
+        if st.button("➕ Add Item", type="primary"):
             if not new_name.strip() or not new_unit.strip():
-                st.error("❌ Item name and unit are required.")
-            elif new_name.strip() in master_df["ITEM"].values:
-                st.error("❌ This item already exists.")
+                st.error("Name and unit are required.")
+            elif not items_df.empty and new_name.strip() in items_df["ITEM"].values:
+                st.error("Item already exists.")
             else:
-                ws = ensure_sheet(spreadsheet, MASTER_SHEET, MASTER_HEADERS)
-                ws.append_row([new_name.strip(), new_cost, new_unit.strip(), new_cat, "YES"])
-                st.success(f"✅ **{new_name}** added to Master List!")
-                st.rerun()
+                ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+                ws.append_row([new_name.strip(), new_cost, new_unit.strip(), new_cat, new_begin, "YES"])
+                invalidate_cache()
+                st.success(f"✅ {new_name} added!"); st.rerun()
         st.markdown('</div>', unsafe_allow_html=True)
 
     with tab2:
-        if master_df.empty:
-            st.info("No ingredients yet.")
+        if items_df.empty:
+            st.info("No items yet.")
         else:
-            search = st.text_input("🔍 Search to Edit", placeholder="Type item name...")
-            filtered_df = master_df[master_df["ITEM"].str.contains(search, case=False, na=False)] if search else master_df
-            selected = st.selectbox("Select Item to Edit", filtered_df["ITEM"].tolist())
-
-            if selected:
-                item_row = master_df[master_df["ITEM"] == selected].iloc[0]
-                row_idx  = master_df[master_df["ITEM"] == selected].index[0] + 2
-
+            search = st.text_input("🔍 Search", key="edit_search")
+            fdf = items_df[items_df["ITEM"].str.contains(search, case=False, na=False)] if search else items_df
+            sel = st.selectbox("Select Item", fdf["ITEM"].tolist())
+            if sel:
+                row = items_df[items_df["ITEM"]==sel].iloc[0]
+                ridx = items_df[items_df["ITEM"]==sel].index[0] + 2
                 st.markdown('<div class="card">', unsafe_allow_html=True)
                 c1, c2 = st.columns(2)
                 with c1:
-                    edit_cost = st.number_input("Unit Cost (₱)", value=float(item_row["UNIT COST"]), step=0.0001, format="%.4f", key="edit_cost")
-                    edit_unit = st.text_input("Unit of Measure", value=str(item_row["UNIT OF MEASURE"]), key="edit_unit")
+                    e_cost  = st.number_input("Unit Cost", value=num(row["UNIT COST"]), step=0.0001, format="%.4f", key="e_cost")
+                    e_unit  = st.text_input("Unit of Measure", value=str(row["UNIT OF MEASURE"]), key="e_unit")
+                    e_begin = st.number_input("Beginning Stock", value=num(row["BEGINNING_STOCKS"]), step=0.01, format="%.2f", key="e_begin")
                 with c2:
-                    edit_cat  = st.selectbox("Category", CATEGORIES, index=CATEGORIES.index(item_row["CATEGORY"]) if item_row["CATEGORY"] in CATEGORIES else 0, key="edit_cat")
-                    edit_active = st.selectbox("Status", ["YES","NO"], index=0 if item_row["ACTIVE"]=="YES" else 1, key="edit_active")
-
+                    e_cat    = st.selectbox("Category", CATEGORIES, index=CATEGORIES.index(row["CATEGORY"]) if row["CATEGORY"] in CATEGORIES else 0, key="e_cat")
+                    e_active = st.selectbox("Status", ["YES","NO"], index=0 if row["ACTIVE"]=="YES" else 1, key="e_active")
                 if st.button("💾 Save Changes", type="primary"):
-                    ws = spreadsheet.worksheet(MASTER_SHEET)
-                    ws.update_cell(row_idx, 2, edit_cost)
-                    ws.update_cell(row_idx, 3, edit_unit)
-                    ws.update_cell(row_idx, 4, edit_cat)
-                    ws.update_cell(row_idx, 5, edit_active)
-                    st.success(f"✅ **{selected}** updated!")
-                    st.rerun()
+                    ws = ss.worksheet(ITEMS_SHEET)
+                    ws.update_cell(ridx, 2, e_cost)
+                    ws.update_cell(ridx, 3, e_unit)
+                    ws.update_cell(ridx, 4, e_cat)
+                    ws.update_cell(ridx, 5, e_begin)
+                    ws.update_cell(ridx, 6, e_active)
+                    invalidate_cache()
+                    st.success(f"✅ {sel} updated!"); st.rerun()
                 st.markdown('</div>', unsafe_allow_html=True)
 
     with tab3:
-        if master_df.empty:
-            st.info("No ingredients yet.")
+        if items_df.empty:
+            st.info("No items yet.")
         else:
-            show_inactive = st.checkbox("Show inactive items")
-            display_df = master_df if show_inactive else master_df[master_df["ACTIVE"]=="YES"]
-            st.dataframe(display_df, use_container_width=True, hide_index=True)
-            st.caption(f"Total: {len(display_df)} items")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: MONTH MANAGER
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "📅 Month Manager":
-    st.markdown('<div class="main-header"><div><h1>📅 Month Manager</h1><p>Create new months and carry over ending stocks</p></div></div>', unsafe_allow_html=True)
-
-    all_sheets = [ws.title for ws in spreadsheet.worksheets() if ws.title.startswith("SUMMARY - ")]
-    months_available = [s.replace("SUMMARY - ", "") for s in all_sheets]
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Existing Months</div>', unsafe_allow_html=True)
-    if months_available:
-        for m in months_available:
-            st.markdown(f"✅ **{m}**")
-    else:
-        st.info("No months set up yet. Go to Setup first.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Start a New Month</div>', unsafe_allow_html=True)
-    st.write("This will create a new month summary and automatically carry over the **Ending Stocks** from the previous month as the new **Beginning Stocks**.")
-
-    col1, col2 = st.columns(2)
-    with col1:
-        prev_month = st.selectbox("Previous Month (copy ending from)", months_available if months_available else ["None"])
-    with col2:
-        new_month_name = st.text_input("New Month Name", placeholder="e.g. JUN 2026")
-
-    if st.button("📅 Create New Month", type="primary"):
-        if not new_month_name.strip():
-            st.error("❌ Please enter the new month name.")
-        elif f"SUMMARY - {new_month_name.upper()}" in [ws.title for ws in spreadsheet.worksheets()]:
-            st.warning(f"⚠️ {new_month_name.upper()} already exists.")
-        else:
-            master_df = load_master(spreadsheet)
-            prev_sheet_name = f"SUMMARY - {prev_month}"
-            ending_map = {}
-
-            if prev_month != "None":
-                try:
-                    prev_ws = spreadsheet.worksheet(prev_sheet_name)
-                    prev_records = prev_ws.get_all_records()
-                    ending_map = {r["ITEM"]: float(r.get("ENDING STOCKS", 0) or 0) for r in prev_records}
-                except Exception as e:
-                    st.warning(f"Could not load previous month: {e}")
-
-            new_sheet_name = f"SUMMARY - {new_month_name.upper()}"
-            new_ws = spreadsheet.add_worksheet(title=new_sheet_name, rows=2000, cols=20)
-            new_ws.append_row(SUMMARY_HEADERS)
-
-            rows = []
-            for _, item in master_df[master_df["ACTIVE"] == "YES"].iterrows():
-                name     = item["ITEM"]
-                cost     = float(item["UNIT COST"]) if item["UNIT COST"] else 0
-                beginning = ending_map.get(name, 0)
-                rows.append([name, cost, item["UNIT OF MEASURE"], item["CATEGORY"],
-                              beginning, 0, 0, 0, 0, 0, 0, 0, 0, beginning, beginning * cost])
-            if rows:
-                new_ws.append_rows(rows)
-
-            st.success(f"✅ **{new_month_name.upper()}** created with {len(rows)} items! Beginning stocks carried over from {prev_month}.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: SEARCH & HISTORY
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "🔍 Search & History":
-    st.markdown('<div class="main-header"><div><h1>🔍 Search & History</h1><p>Find any ingredient or PO and see its full transaction log</p></div></div>', unsafe_allow_html=True)
-
-    log_df = load_log(spreadsheet)
-    master_df = load_master(spreadsheet)
-
-    search_tab, po_tab = st.tabs(["🔍 Search by Ingredient", "📋 Search by PO Number"])
-
-    with search_tab:
-        search = st.text_input("🔍 Search Ingredient", placeholder="Type ingredient name...")
-
-        if search:
-            items_found = master_df[master_df["ITEM"].str.contains(search, case=False, na=False)]["ITEM"].tolist()
-            if not items_found:
-                st.warning("No ingredients found.")
-            else:
-                selected = st.selectbox("Select Ingredient", items_found)
-                if selected:
-                    item_info = master_df[master_df["ITEM"] == selected].iloc[0]
-
-                    st.markdown(f"""
-                    <div class="info-box">
-                        📦 <strong>{selected}</strong> &nbsp;|&nbsp;
-                        Unit: <strong>{item_info['UNIT OF MEASURE']}</strong> &nbsp;|&nbsp;
-                        Cost/unit: <strong>₱{float(item_info['UNIT COST']):.4f}</strong> &nbsp;|&nbsp;
-                        Category: <strong>{item_info['CATEGORY'].upper()}</strong>
-                    </div>
-                    """, unsafe_allow_html=True)
-
-                    if not log_df.empty:
-                        item_log = log_df[log_df["ITEM"] == selected].copy()
-                        if item_log.empty:
-                            st.info("No transactions recorded yet for this item.")
-                        else:
-                            item_log = item_log.sort_values("TIMESTAMP", ascending=False)
-                            st.markdown(f"**{len(item_log)} transaction(s) found**")
-
-                            c1, c2, c3, c4 = st.columns(4)
-                            def num(col): return pd.to_numeric(item_log.get(col, 0), errors="coerce").fillna(0).sum()
-                            with c1:
-                                st.metric("Total Add'l/In", f"{num('ADD\'L/IN'):,.2f}")
-                            with c2:
-                                st.metric("Total Damaged/Out", f"{num('DAMAGED/OUT'):,.2f}")
-                            with c3:
-                                total_used = num("CAFÉ") + num("BAR") + num("KITCHEN ALA CARTE") + num("KITCHEN BANQUET") + num("RESTO")
-                                st.metric("Total Used", f"{total_used:,.2f}")
-                            with c4:
-                                st.metric("Transactions", len(item_log))
-
-                            st.markdown("### Transaction Log")
-                            for _, row in item_log.iterrows():
-                                movements = []
-                                for col in ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR","KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]:
-                                    val = float(row.get(col, 0) or 0)
-                                    if val:
-                                        movements.append(f"{col}: **{val:,.2f}**")
-
-                                po_ref = row.get('PO NUMBER', '')
-                                dept_ref = row.get('DEPARTMENT', '')
-                                po_badge = f'&nbsp;|&nbsp; 🧾 <strong>{po_ref}</strong>' if po_ref else ''
-                                dept_badge = f'&nbsp;|&nbsp; 🏢 {dept_ref}' if dept_ref else ''
-
-                                st.markdown(f"""
-                                <div class="log-entry">
-                                    <div><strong>👤 {row.get('STAFF','—')}</strong> &nbsp;|&nbsp; 📅 {row.get('DATE','—')} &nbsp;|&nbsp; 📆 {row.get('MONTH','—')}{po_badge}{dept_badge}</div>
-                                    <div style='margin-top:4px;'>{' &nbsp;·&nbsp; '.join(movements) if movements else 'No quantities entered'}</div>
-                                    {'<div style="color:#888; font-size:0.8rem; margin-top:4px;">📝 ' + str(row.get('NOTES','')) + '</div>' if row.get('NOTES') else ''}
-                                    <div class="timestamp">{row.get('TIMESTAMP','')}</div>
-                                </div>
-                                """, unsafe_allow_html=True)
-                    else:
-                        st.info("No transaction log yet.")
-
-    with po_tab:
-        po_search = st.text_input("🧾 Search PO Number", placeholder="e.g. PO-20260628...")
-
-        if po_search and not log_df.empty:
-            if "PO NUMBER" in log_df.columns:
-                po_log = log_df[log_df["PO NUMBER"].astype(str).str.contains(po_search, case=False, na=False)]
-                if po_log.empty:
-                    st.warning("No PO found with that number.")
-                else:
-                    po_numbers = po_log["PO NUMBER"].unique()
-                    for po_num in po_numbers:
-                        po_entries = po_log[po_log["PO NUMBER"] == po_num]
-                        first = po_entries.iloc[0]
-                        st.markdown(f"""
-                        <div class="info-box">
-                            🧾 <strong>{po_num}</strong> &nbsp;|&nbsp;
-                            📅 {first.get('DATE','—')} &nbsp;|&nbsp;
-                            👤 {first.get('STAFF','—')} &nbsp;|&nbsp;
-                            🏢 {first.get('DEPARTMENT','—')} &nbsp;|&nbsp;
-                            <strong>{len(po_entries)} item(s)</strong>
-                        </div>
-                        """, unsafe_allow_html=True)
-
-                        for _, row in po_entries.iterrows():
-                            movements = []
-                            for col in ["ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR","KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO"]:
-                                val = float(row.get(col, 0) or 0)
-                                if val:
-                                    movements.append(f"{col}: **{val:,.2f}**")
-                            st.markdown(f"""
-                            <div class="log-entry">
-                                <div><strong>📦 {row.get('ITEM','—')}</strong></div>
-                                <div style='margin-top:4px;'>{' &nbsp;·&nbsp; '.join(movements) if movements else 'No quantities'}</div>
-                                {'<div style="color:#888; font-size:0.8rem; margin-top:4px;">📝 ' + str(row.get('NOTES','')) + '</div>' if row.get('NOTES') else ''}
-                            </div>
-                            """, unsafe_allow_html=True)
-            else:
-                st.info("No PO data found. Old entries may not have PO numbers.")
-
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: SUMMARY
-# ══════════════════════════════════════════════════════════════════════════════
-elif page == "📊 Summary":
-    st.markdown('<div class="main-header"><div><h1>📊 Summary</h1><p>Live inventory summary by month</p></div></div>', unsafe_allow_html=True)
-
-    all_sheets = [ws.title for ws in spreadsheet.worksheets() if ws.title.startswith("SUMMARY - ")]
-    months_available = [s.replace("SUMMARY - ", "") for s in all_sheets]
-
-    if not months_available:
-        st.warning("No months set up yet. Please go to Setup first.")
-    else:
-        selected_month = st.selectbox("Select Month", months_available)
-        cat_filter = st.multiselect("Filter by Category", ["All","beverage","beef","chicken","pork","seafood","fresh","dry","wet","rtc","meat","frozen","dessert"], default=["All"])
-
-        sum_ws = spreadsheet.worksheet(f"SUMMARY - {selected_month}")
-        records = sum_ws.get_all_records()
-        df = pd.DataFrame(records) if records else pd.DataFrame(columns=SUMMARY_HEADERS)
-
-        if not df.empty:
-            if "All" not in cat_filter and cat_filter:
-                df = df[df["CATEGORY"].isin(cat_filter)]
-
-            total_worth = pd.to_numeric(df["TOTAL WORTH OF STOCKS"], errors="coerce").fillna(0).sum()
-            total_items = len(df[pd.to_numeric(df["ENDING STOCKS"], errors="coerce").fillna(0) > 0])
-
-            c1, c2, c3 = st.columns(3)
-            with c1:
-                st.metric("Total Items with Stock", total_items)
-            with c2:
-                st.metric("Total Worth of Stocks", f"₱{total_worth:,.2f}")
-            with c3:
-                st.metric("Month", selected_month)
-
-            st.markdown("---")
-            numeric_cols = ["BEGINNING STOCKS","ADD'L/IN","OVER","DAMAGED/OUT","CAFÉ","BAR","KITCHEN ALA CARTE","KITCHEN BANQUET","RESTO","ENDING STOCKS","TOTAL WORTH OF STOCKS"]
-            for col in numeric_cols:
-                if col in df.columns:
-                    df[col] = pd.to_numeric(df[col], errors="coerce").fillna(0)
-
+            show_all = st.checkbox("Show inactive items")
+            df = items_df if show_all else items_df[items_df["ACTIVE"]=="YES"]
             st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption(f"{len(df)} items")
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: EXPORT TO EXCEL
 # ══════════════════════════════════════════════════════════════════════════════
 elif page == "⬇️ Export to Excel":
-    st.markdown('<div class="main-header"><div><h1>⬇️ Export to Excel</h1><p>Download monthly inventory in your original format</p></div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="main-header"><h1>⬇️ Export to Excel</h1><p>Generate your monthly inventory file — same format as your manual sheet</p></div>', unsafe_allow_html=True)
 
-    all_sheets = [ws.title for ws in spreadsheet.worksheets() if ws.title.startswith("SUMMARY - ")]
-    months_available = [s.replace("SUMMARY - ", "") for s in all_sheets]
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
 
-    if not months_available:
-        st.warning("No months available to export.")
+    if items_df.empty:
+        st.warning("No items yet."); st.stop()
+
+    if not log_df.empty:
+        months = sorted(log_df["MONTH"].dropna().unique().tolist(), reverse=True)
     else:
-        selected_month = st.selectbox("Select Month to Export", months_available)
+        months = [date.today().strftime("%b %Y").upper()]
 
-        if st.button("📥 Generate Excel File", type="primary"):
-            sum_ws = spreadsheet.worksheet(f"SUMMARY - {selected_month}")
-            records = sum_ws.get_all_records()
-            df = pd.DataFrame(records) if records else pd.DataFrame(columns=SUMMARY_HEADERS)
+    sel_month = st.selectbox("Select Month to Export", months)
 
-            wb = openpyxl.Workbook()
-            ws_out = wb.active
-            ws_out.title = "SUMMARY"
+    if st.button("📥 Generate Excel", type="primary"):
+        month_log = log_df[log_df["MONTH"]==sel_month] if not log_df.empty else pd.DataFrame()
+        active = items_df[items_df["ACTIVE"]=="YES"]
 
-            header_fill = PatternFill("solid", fgColor="1a1a2e")
-            header_font = Font(bold=True, color="FFFFFF", size=11)
-            header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
-            thin = Side(style="thin", color="CCCCCC")
-            border = Border(left=thin, right=thin, top=thin, bottom=thin)
+        # Get unique days in month
+        if not month_log.empty:
+            days = sorted(month_log["DATE"].dropna().unique().tolist())
+        else:
+            days = []
 
+        wb = openpyxl.Workbook()
+
+        # Styles
+        hdr_fill  = PatternFill("solid", fgColor="1A2E1A")
+        hdr_font  = Font(bold=True, color="A8C896", size=10)
+        title_font= Font(bold=True, color="FFFFFF", size=13)
+        hdr_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+        thin = Side(style="thin", color="2A3828")
+        border = Border(left=thin, right=thin, top=thin, bottom=thin)
+
+        COLS = ["ITEM","UNIT COST","UNIT OF MEASURE","CATEGORY","BEGINNING",
+                "ADD'L/IN","OVER","RESTAURANT","BANQUET","CAFÉ","BAR","OTHERS","SPOILAGE",
+                "ENDING STOCKS","TOTAL WORTH"]
+
+        cat_fills = {
+            "beverage":"0E1E2E","beef":"1E0E0E","chicken":"1E160E","seafood":"0E1620",
+            "fresh":"0E1E12","dry":"1E1A0E","wet":"0E1C1A","rtc":"1A0E1E",
+            "pork":"1E0E0E","meat":"141414","frozen":"0E1828","dessert":"1E1A0E"
+        }
+
+        def write_sheet(ws_out, day_log, title_str, is_summary=False):
             ws_out.merge_cells("A1:O1")
-            title_cell = ws_out["A1"]
-            title_cell.value = f"SERVANDO MAIN WAREHOUSE INVENTORY — {selected_month}"
-            title_cell.font = Font(bold=True, size=14, color="FFFFFF")
-            title_cell.fill = PatternFill("solid", fgColor="0f3460")
-            title_cell.alignment = Alignment(horizontal="center", vertical="center")
-            ws_out.row_dimensions[1].height = 30
+            tc = ws_out["A1"]
+            tc.value = title_str
+            tc.font = title_font
+            tc.fill = PatternFill("solid", fgColor="0A1208")
+            tc.alignment = Alignment(horizontal="center", vertical="center")
+            ws_out.row_dimensions[1].height = 28
 
-            for col_idx, header in enumerate(SUMMARY_HEADERS, 1):
-                cell = ws_out.cell(row=2, column=col_idx, value=header)
-                cell.fill = header_fill
-                cell.font = header_font
-                cell.alignment = header_align
-                cell.border = border
-            ws_out.row_dimensions[2].height = 40
+            for ci, col in enumerate(COLS, 1):
+                c = ws_out.cell(row=2, column=ci, value=col)
+                c.fill = hdr_fill; c.font = hdr_font
+                c.alignment = hdr_align; c.border = border
+            ws_out.row_dimensions[2].height = 36
 
-            cat_colors = {
-                "beverage": "EBF5FB", "beef": "FDEDEC", "chicken": "FEF9E7",
-                "seafood": "E8F8F5", "fresh": "E9F7EF", "dry": "FDF2E9",
-                "wet": "F4ECF7", "rtc": "EAF2FF", "pork": "FDEDEC",
-                "meat": "FDFEFE", "frozen": "EBF5FB", "dessert": "FEF9E7"
-            }
-            num_fmt = '#,##0.0000'
+            for ri, (_, item) in enumerate(active.iterrows(), 3):
+                name = item["ITEM"]
+                cost = num(item["UNIT COST"])
+                beg  = num(item["BEGINNING_STOCKS"])
+                cat  = str(item["CATEGORY"]).lower()
 
-            for row_idx, (_, row) in enumerate(df.iterrows(), 3):
-                cat = str(row.get("CATEGORY", "")).lower()
-                fill_color = cat_colors.get(cat, "FFFFFF")
-                row_fill = PatternFill("solid", fgColor=fill_color)
+                if not day_log.empty:
+                    ilog   = day_log[day_log["ITEM"]==name]
+                    add_in = ilog["ADD_IN"].apply(num).sum()
+                    over   = ilog["OVER"].apply(num).sum()
+                    rest   = ilog["RESTAURANT"].apply(num).sum()
+                    banq   = ilog["BANQUET"].apply(num).sum()
+                    cafe   = ilog["CAFE"].apply(num).sum()
+                    bar    = ilog["BAR"].apply(num).sum()
+                    others = ilog["OTHERS"].apply(num).sum()
+                    spoil  = ilog["SPOILAGE"].apply(num).sum()
+                else:
+                    add_in=over=rest=banq=cafe=bar=others=spoil=0
 
-                for col_idx, header in enumerate(SUMMARY_HEADERS, 1):
-                    val = row.get(header, "")
-                    cell = ws_out.cell(row=row_idx, column=col_idx, value=val)
-                    cell.fill = row_fill
-                    cell.border = border
-                    if col_idx in [2, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]:
-                        cell.number_format = num_fmt
+                ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+                worth  = ending * cost
+                rfill  = PatternFill("solid", fgColor=cat_fills.get(cat,"111E11"))
+
+                vals = [name, cost, item["UNIT OF MEASURE"], item["CATEGORY"],
+                        beg, add_in, over, rest, banq, cafe, bar, others, spoil,
+                        round(ending,4), round(worth,4)]
+                for ci, val in enumerate(vals, 1):
+                    cell = ws_out.cell(row=ri, column=ci, value=val)
+                    cell.fill = rfill; cell.border = border
+                    if ci in [2,5,6,7,8,9,10,11,12,13,14,15]:
+                        cell.number_format = "#,##0.0000"
                         cell.alignment = Alignment(horizontal="right")
                     else:
                         cell.alignment = Alignment(vertical="center")
 
-            total_row = len(df) + 3
-            ws_out.cell(row=total_row, column=1, value="TOTAL WORTH OF STOCKS").font = Font(bold=True)
-            ws_out.cell(row=total_row, column=1).fill = PatternFill("solid", fgColor="1a1a2e")
-            ws_out.cell(row=total_row, column=1).font = Font(bold=True, color="FFFFFF")
-
-            total_worth = pd.to_numeric(df["TOTAL WORTH OF STOCKS"], errors="coerce").fillna(0).sum()
-            tw_cell = ws_out.cell(row=total_row, column=15, value=round(total_worth, 4))
-            tw_cell.fill = PatternFill("solid", fgColor="0f3460")
-            tw_cell.font = Font(bold=True, color="FFFFFF")
-            tw_cell.number_format = '#,##0.0000'
-
-            col_widths = [35, 12, 16, 12, 16, 10, 10, 14, 10, 10, 18, 18, 10, 15, 20]
-            for i, w in enumerate(col_widths, 1):
-                ws_out.column_dimensions[get_column_letter(i)].width = w
-
+            # Column widths
+            for ci, w in enumerate([32,11,14,11,13,10,10,12,12,10,10,10,12,14,16],1):
+                ws_out.column_dimensions[get_column_letter(ci)].width = w
             ws_out.freeze_panes = "A3"
 
-            buf = BytesIO()
-            wb.save(buf)
-            buf.seek(0)
+        # One sheet per day
+        for day_str in days:
+            day_log = month_log[month_log["DATE"]==day_str]
+            try:
+                d = datetime.strptime(day_str, "%Y-%m-%d")
+                tab_name = d.strftime("%d")
+                title = f"SERVANDO MAIN WAREHOUSE INVENTORY — {d.strftime('%B %d, %Y').upper()}"
+            except:
+                tab_name = day_str[-2:]
+                title = f"SERVANDO MAIN WAREHOUSE INVENTORY — {day_str}"
 
-            st.download_button(
-                label=f"📥 Download {selected_month} Inventory.xlsx",
-                data=buf,
-                file_name=f"SERVANDO_INVENTORY_{selected_month.replace(' ', '_')}.xlsx",
-                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-            )
-            st.success("✅ Excel file ready for download!")
+            ws_out = wb.create_sheet(title=tab_name)
+            write_sheet(ws_out, day_log, title)
+
+        # SUMMARY sheet
+        ws_sum = wb.create_sheet(title="SUMMARY")
+        write_sheet(ws_sum, month_log, f"SERVANDO MAIN WAREHOUSE INVENTORY — {sel_month} SUMMARY", is_summary=True)
+
+        # Remove default sheet
+        if "Sheet" in wb.sheetnames:
+            del wb["Sheet"]
+
+        buf = BytesIO()
+        wb.save(buf); buf.seek(0)
+
+        st.download_button(
+            label=f"📥 Download {sel_month} Inventory.xlsx",
+            data=buf,
+            file_name=f"SERVANDO_WAREHOUSE_{sel_month.replace(' ','_')}.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.success("✅ Excel ready! One tab per day with movements + SUMMARY tab.")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: SETUP
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "⚙️ Setup":
+    st.markdown('<div class="main-header"><h1>⚙️ Setup</h1><p>Initialize system · Import items</p></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Import 557 Items from May 2026 Inventory</div>', unsafe_allow_html=True)
+    st.write("This imports all your existing ingredients into the new system. Run once. Skips items that already exist.")
+
+    if st.button("🚀 Import Items", type="primary"):
+        ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+        existing = {r["ITEM"] for r in ws.get_all_records()}
+        new_rows = []
+        for item in INITIAL_ITEMS:
+            name, beginning, cost, uom, cat = item
+            if name not in existing:
+                new_rows.append([name, round(cost,6), uom, cat, round(beginning,4), "YES"])
+
+        if new_rows:
+            # Batch in groups of 100 to avoid rate limits
+            for i in range(0, len(new_rows), 100):
+                ws.append_rows(new_rows[i:i+100])
+            invalidate_cache()
+            st.success(f"✅ Imported {len(new_rows)} items!")
+        else:
+            st.info("All items already exist.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Current Status</div>', unsafe_allow_html=True)
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
+    c1, c2, c3 = st.columns(3)
+    with c1: st.metric("Items in Master", len(items_df))
+    with c2: st.metric("Total Transactions", len(log_df))
+    with c3: st.metric("Active Items", len(items_df[items_df["ACTIVE"]=="YES"]) if not items_df.empty else 0)
+    st.markdown('</div>', unsafe_allow_html=True)
