@@ -1449,8 +1449,7 @@ elif page == "⬇️ Export to Excel":
         # So each day's BEGINNING = previous day's ENDING
         item_running = {row["ITEM"]: num(row["BEGINNING_STOCKS"]) for _, row in active.iterrows()}
 
-        def write_day_sheet(ws_out, day_str, day_label, tab_log):
-            nonlocal item_running
+        def write_day_sheet(ws_out, day_str, day_label, tab_log, item_running):
 
             # Title row
             ws_out.merge_cells("A1:O1")
@@ -1583,6 +1582,7 @@ elif page == "⬇️ Export to Excel":
                 else:
                     add_in=over=rest=banq=cafe=bar=others=spoil=0.0
                 item_running[name] = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+            return item_running
 
         # ── Write all 31 days ──────────────────────────────────────────────
         for day_str in all_days:
@@ -1596,7 +1596,7 @@ elif page == "⬇️ Export to Excel":
 
             tab_log = month_log[month_log["DATE"] == day_str] if not month_log.empty else pd.DataFrame()
             ws_day  = wb.create_sheet(title=tab_name)
-            write_day_sheet(ws_day, day_str, day_label, tab_log)
+            item_running = write_day_sheet(ws_day, day_str, day_label, tab_log, item_running)
 
         # ── SUMMARY sheet ──────────────────────────────────────────────────
         ws_sum = wb.create_sheet(title="SUMMARY")
