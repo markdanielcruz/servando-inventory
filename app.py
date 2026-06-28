@@ -784,7 +784,7 @@ with st.sidebar:
         "📥 Incoming Deliveries",
         "📋 Purchase Orders",
         "🔧 Stock Adjustment",
-        "📆 Monthly Report",
+        "📆 Generate Report",
         "🔍 Item History",
         "📦 Items Master",
         "⬇️ Export to Excel",
@@ -1151,8 +1151,8 @@ elif page == "🔧 Stock Adjustment":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: MONTHLY REPORT
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📆 Monthly Report":
-    st.markdown('<div class="main-header"><h1>📆 Monthly Report</h1><p>Beginning → Deliveries → POs → Adjustments → Ending</p></div>', unsafe_allow_html=True)
+elif page == "📆 Generate Report":
+    st.markdown('<div class="main-header"><h1>📆 Generate Report</h1><p>Live inventory snapshot — generate anytime</p></div>', unsafe_allow_html=True)
 
     items_df = load_items(SPREADSHEET_ID)
     log_df   = load_log(SPREADSHEET_ID)
