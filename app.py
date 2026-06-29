@@ -923,8 +923,7 @@ with st.sidebar:
         "📥 Incoming Deliveries",
         "📋 Purchase Orders",
         "🔧 Stock Adjustment",
-        "📆 Generate Report",
-        "🔍 Item History",
+                "🔍 Item History",
         "📦 Items Master",
         "⬇️ Export to Excel",
         "⚙️ Setup",
@@ -1374,81 +1373,582 @@ elif page == "🔧 Stock Adjustment":
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: MONTHLY REPORT
 # ══════════════════════════════════════════════════════════════════════════════
-elif page == "📆 Generate Report":
-    st.markdown('<div class="main-header"><h1>📆 Generate Report</h1><p>Live inventory snapshot — generate anytime</p></div>', unsafe_allow_html=True)
+elif page == "🔍 Item History":
+    st.markdown('<div class="main-header"><h1>🔍 Item History</h1><p>Full transaction log per item or per reference number</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
+
+    tab1, tab2 = st.tabs(["🔍 Search by Item", "🧾 Search by Reference (PO / Delivery / Adjustment)"])
+
+    with tab1:
+        if items_df.empty:
+            st.info("No items yet.")
+        else:
+            search = st.text_input("Search Item", placeholder="Type item name...")
+            active_names = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist()
+            filtered_names = [i for i in active_names if search.lower() in i.lower()] if search else active_names
+            sel = st.selectbox("Select Item", filtered_names, key="hist_item")
+
+            if sel:
+                info = items_df[items_df["ITEM"]==sel].iloc[0]
+                st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.3f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()} &nbsp;|&nbsp; Current Beginning: <strong>{num(info["BEGINNING_STOCKS"]):,.2f}</strong></div>', unsafe_allow_html=True)
+
+                if log_df.empty:
+                    st.info("No transactions yet.")
+                else:
+                    ilog = log_df[log_df["ITEM"]==sel].copy()
+                    if ilog.empty:
+                        st.info("No transactions recorded for this item yet.")
+                    else:
+                        # Summary metrics
+                        total_in    = ilog["ADD_IN"].apply(num).sum()
+                        total_over  = ilog["OVER"].apply(num).sum()
+                        total_out   = (ilog["RESTAURANT"].apply(num) + ilog["BANQUET"].apply(num) +
+                                       ilog["CAFE"].apply(num) + ilog["BAR"].apply(num) +
+                                       ilog["OTHERS"].apply(num)).sum()
+                        total_spoil = ilog["SPOILAGE"].apply(num).sum()
+                        beginning   = num(info["BEGINNING_STOCKS"])
+                        ending_stock = beginning + total_in + total_over - total_out - total_spoil
+
+                        c1,c2,c3,c4,c5 = st.columns(5)
+                        with c1: st.metric("Total Incoming", f"{total_in:,.2f}")
+                        with c2: st.metric("Total Released (PO)", f"{total_out:,.2f}")
+                        with c3: st.metric("Total Spoilage", f"{total_spoil:,.2f}")
+                        with c4: st.metric("Ending Stock", f"{ending_stock:,.2f}")
+                        with c5: st.metric("Total Transactions", len(ilog))
+
+                        st.markdown("---")
+
+                        # Group by transaction type
+                        for txn_type, icon, color in [
+                            ("DELIVERY",   "📥", "#4A8ACC"),
+                            ("PO",         "📋", "#8CAF7A"),
+                            ("ADJUSTMENT", "🔧", "#C4A840"),
+                            ("CARRYOVER",  "🔄", "#AA6ACC"),
+                        ]:
+                            tlog = ilog[ilog["TXN_TYPE"]==txn_type].sort_values("TIMESTAMP", ascending=False)
+                            if tlog.empty:
+                                continue
+
+                            st.markdown(f'<div style="font-size:0.65rem;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:{color};margin:12px 0 6px 0;padding-bottom:4px;border-bottom:1px solid #1E2E1C;">{icon} {txn_type} — {len(tlog)} record(s)</div>', unsafe_allow_html=True)
+
+                            for _, row in tlog.iterrows():
+                                ref  = row.get("REF_NUMBER","")
+                                date_str = row.get("DATE","")
+                                staff = row.get("STAFF","")
+                                parts = []
+                                for col, label in [("ADD_IN","Incoming"),("OVER","Over (Adjustment)"),
+                                                   ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
+                                                   ("CAFE","Café"),("BAR","Bar"),
+                                                   ("OTHERS","Others"),("SPOILAGE","Spoilage")]:
+                                    v = num(row.get(col,0))
+                                    if v: parts.append(f"<strong style='color:{color};'>{label}:</strong> {v:,.2f}")
+                                _notes_val = str(row.get("NOTES", "")).strip()
+                                notes_str = f'<div style="color:#5A7A52;font-size:0.78rem;margin-top:3px;">📝 {_notes_val}</div>' if _notes_val else ""
+                                st.markdown(f'<div class="log-entry" style="border-left-color:{color};"><div style="display:flex;justify-content:space-between;align-items:center;"><span>📅 <strong>{date_str}</strong> &nbsp;·&nbsp; 👤 {staff}</span><span style="color:#3A5238;font-size:0.75rem;">{ref}</span></div><div style="margin-top:5px;">{" &nbsp;&nbsp; ".join(parts) if parts else "—"}</div>{notes_str}</div>', unsafe_allow_html=True)
+
+    with tab2:
+        ref_search = st.text_input("Search Reference #", placeholder="e.g. PO-20260628, DEL-..., ADJ-...")
+        if ref_search and not log_df.empty:
+            rlog = log_df[log_df["REF_NUMBER"].astype(str).str.contains(ref_search, case=False, na=False)]
+            if rlog.empty:
+                st.warning("No records found.")
+            else:
+                for ref in rlog["REF_NUMBER"].unique():
+                    rr = rlog[rlog["REF_NUMBER"]==ref]
+                    first = rr.iloc[0]
+                    st.markdown(f'<div class="info-box">🧾 <strong>{ref}</strong> &nbsp;|&nbsp; {first.get("TXN_TYPE","")} &nbsp;|&nbsp; 📅 {first.get("DATE","")} &nbsp;|&nbsp; 👤 {first.get("STAFF","")} &nbsp;|&nbsp; {len(rr)} item(s)</div>', unsafe_allow_html=True)
+                    for _, row in rr.iterrows():
+                        parts = []
+                        for col, label in [("ADD_IN","Incoming"),("OVER","Over"),
+                                           ("RESTAURANT","Restaurant"),("BANQUET","Banquet"),
+                                           ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
+                            v = num(row.get(col,0))
+                            if v: parts.append(f"{label}: <strong>{v:,.2f}</strong>")
+                        st.markdown(f'<div class="log-entry">📦 <strong>{row.get("ITEM","")}</strong><div style="margin-top:3px;">{" &nbsp;·&nbsp; ".join(parts) if parts else "—"}</div></div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: ITEMS MASTER
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "📦 Items Master":
+    st.markdown('<div class="main-header"><h1>📦 Items Master</h1><p>Manage your ingredient list</p></div>', unsafe_allow_html=True)
+
+    items_df = load_items(SPREADSHEET_ID)
+    tab1, tab2, tab3 = st.tabs(["➕ Add New Item", "✏️ Edit / Deactivate", "📋 View All"])
+
+    with tab1:
+        st.markdown('<div class="card">', unsafe_allow_html=True)
+        c1, c2 = st.columns(2)
+        with c1:
+            new_name = st.text_input("Item Name *")
+            new_unit = st.text_input("Unit of Measure *", placeholder="gram / ml / piece / bottle")
+        with c2:
+            new_cost = st.number_input("Unit Cost (₱) *", min_value=0.0, step=0.0001, format="%.4f")
+            new_cat  = st.selectbox("Category *", CATEGORIES)
+        new_begin = st.number_input("Beginning Stock", min_value=0.0, step=0.01, format="%.2f")
+
+        if st.button("➕ Add Item", type="primary"):
+            if not new_name.strip() or not new_unit.strip():
+                st.error("Name and unit are required.")
+            elif not items_df.empty and new_name.strip() in items_df["ITEM"].values:
+                st.error("Item already exists.")
+            else:
+                ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+                ws.append_row([new_name.strip(), new_cost, new_unit.strip(), new_cat, new_begin, "YES"])
+                invalidate_cache()
+                st.success(f"✅ {new_name} added!"); st.rerun()
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab2:
+        if items_df.empty:
+            st.info("No items yet.")
+        else:
+            search = st.text_input("🔍 Search", key="edit_search")
+            fdf = items_df[items_df["ITEM"].str.contains(search, case=False, na=False)] if search else items_df
+            sel = st.selectbox("Select Item", fdf["ITEM"].tolist())
+            if sel:
+                row = items_df[items_df["ITEM"]==sel].iloc[0]
+                ridx = items_df[items_df["ITEM"]==sel].index[0] + 2
+                st.markdown('<div class="card">', unsafe_allow_html=True)
+                c1, c2 = st.columns(2)
+                with c1:
+                    e_cost  = st.number_input("Unit Cost", value=num(row["UNIT COST"]), step=0.0001, format="%.4f", key="e_cost")
+                    e_unit  = st.text_input("Unit of Measure", value=str(row["UNIT OF MEASURE"]), key="e_unit")
+                    e_begin = st.number_input("Beginning Stock", value=num(row["BEGINNING_STOCKS"]), step=0.01, format="%.2f", key="e_begin")
+                with c2:
+                    e_cat    = st.selectbox("Category", CATEGORIES, index=CATEGORIES.index(row["CATEGORY"]) if row["CATEGORY"] in CATEGORIES else 0, key="e_cat")
+                    e_active = st.selectbox("Status", ["YES","NO"], index=0 if row["ACTIVE"]=="YES" else 1, key="e_active")
+                if st.button("💾 Save Changes", type="primary"):
+                    ws = ss.worksheet(ITEMS_SHEET)
+                    ws.update_cell(ridx, 2, e_cost)
+                    ws.update_cell(ridx, 3, e_unit)
+                    ws.update_cell(ridx, 4, e_cat)
+                    ws.update_cell(ridx, 5, e_begin)
+                    ws.update_cell(ridx, 6, e_active)
+                    invalidate_cache()
+                    st.success(f"✅ {sel} updated!"); st.rerun()
+                st.markdown('</div>', unsafe_allow_html=True)
+
+    with tab3:
+        if items_df.empty:
+            st.info("No items yet.")
+        else:
+            show_all = st.checkbox("Show inactive items")
+            df = items_df if show_all else items_df[items_df["ACTIVE"]=="YES"]
+            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.caption(f"{len(df)} items")
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: EXPORT TO EXCEL
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "⬇️ Export to Excel":
+    st.markdown('<div class="main-header"><h1>⬇️ Export to Excel</h1><p>Generate inventory report for any date range</p></div>', unsafe_allow_html=True)
+
+    import calendar
 
     items_df = load_items(SPREADSHEET_ID)
     log_df   = load_log(SPREADSHEET_ID)
 
     if items_df.empty:
-        st.warning("No items yet."); st.stop()
+        st.warning("No items yet. Go to Setup first."); st.stop()
 
-    # Get available months from log
-    if not log_df.empty and "MONTH" in log_df.columns:
-        months = sorted(log_df["MONTH"].dropna().unique().tolist(), reverse=True)
-    else:
-        months = [date.today().strftime("%b %Y").upper()]
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Select Date Range</div>', unsafe_allow_html=True)
 
-    c1, c2 = st.columns([2,3])
+    c1, c2 = st.columns(2)
     with c1:
-        sel_month = st.selectbox("Select Month", months)
+        from_date = st.date_input("📅 From Date", value=date.today().replace(day=1), key="exp_from")
     with c2:
-        cat_filter = st.multiselect("Filter by Category", ["All"] + CATEGORIES, default=["All"])
+        to_date = st.date_input("📅 To Date", value=date.today(), key="exp_to")
 
-    # Filter log for month
-    month_log = log_df[log_df["MONTH"] == sel_month] if not log_df.empty else pd.DataFrame()
+    if from_date > to_date:
+        st.error("From date must be before To date.")
+        st.stop()
 
-    # Build summary
-    rows = []
-    active = items_df[items_df["ACTIVE"]=="YES"]
-    for _, item in active.iterrows():
-        name = item["ITEM"]
-        cost = num(item["UNIT COST"])
-        beg  = num(item["BEGINNING_STOCKS"])
-        cat  = item["CATEGORY"]
+    # Show how many days and transactions in range
+    from_str = from_date.strftime("%Y-%m-%d")
+    to_str   = to_date.strftime("%Y-%m-%d")
 
-        if not month_log.empty:
-            ilog = month_log[month_log["ITEM"]==name]
-            add_in  = ilog["ADD_IN"].apply(num).sum()
-            over    = ilog["OVER"].apply(num).sum()
-            rest    = ilog["RESTAURANT"].apply(num).sum()
-            banq    = ilog["BANQUET"].apply(num).sum()
-            cafe    = ilog["CAFE"].apply(num).sum()
-            bar     = ilog["BAR"].apply(num).sum()
-            others  = ilog["OTHERS"].apply(num).sum()
-            spoil   = ilog["SPOILAGE"].apply(num).sum()
+    if not log_df.empty and "DATE" in log_df.columns:
+        range_log = log_df[(log_df["DATE"] >= from_str) & (log_df["DATE"] <= to_str)]
+        st.markdown(f'<div class="info-box">📊 <strong>{len(range_log)}</strong> transactions found between <strong>{from_date.strftime("%b %d, %Y")}</strong> and <strong>{to_date.strftime("%b %d, %Y")}</strong></div>', unsafe_allow_html=True)
+    else:
+        range_log = pd.DataFrame()
+        st.markdown('<div class="info-box">No transactions found in this range.</div>', unsafe_allow_html=True)
+
+    if st.button("📥 Generate Excel File", type="primary", use_container_width=True):
+
+        # Build list of all days in range
+        from datetime import timedelta
+        all_days = []
+        cur = from_date
+        while cur <= to_date:
+            all_days.append(cur.strftime("%Y-%m-%d"))
+            cur += timedelta(days=1)
+
+        # File label
+        if from_date.month == to_date.month and from_date.year == to_date.year:
+            file_label = from_date.strftime("%B_%Y")
+            title_label = from_date.strftime("%B %Y").upper()
         else:
-            add_in = over = rest = banq = cafe = bar = others = spoil = 0
+            file_label = f"{from_date.strftime('%b_%Y')}_to_{to_date.strftime('%b_%Y')}"
+            title_label = f"{from_date.strftime('%b %d').upper()} TO {to_date.strftime('%b %d, %Y').upper()}"
 
-        ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
-        worth  = ending * cost
+        active = items_df[items_df["ACTIVE"] == "YES"].copy().reset_index(drop=True)
 
-        rows.append({
-            "ITEM": name, "CATEGORY": cat, "UNIT": item["UNIT OF MEASURE"],
-            "UNIT COST": cost, "BEGINNING": beg,
-            "ADD'L/IN": add_in, "OVER": over,
-            "RESTAURANT": rest, "BANQUET": banq, "CAFÉ": cafe, "BAR": bar,
-            "OTHERS": others, "SPOILAGE": spoil,
-            "ENDING": round(ending,4), "TOTAL WORTH": round(worth,4)
-        })
+        wb = openpyxl.Workbook()
 
-    df = pd.DataFrame(rows)
-    if "All" not in cat_filter and cat_filter:
-        df = df[df["CATEGORY"].isin(cat_filter)]
+        # ── Styles ──────────────────────────────────────────────────────────
+        hdr_fill   = PatternFill("solid", fgColor="1A2E1A")
+        title_fill = PatternFill("solid", fgColor="0A1208")
+        worth_fill = PatternFill("solid", fgColor="0E1C0E")
+        hdr_font   = Font(bold=True, color="A8C896", size=9)
+        title_font = Font(bold=True, color="C8DCC0", size=12)
+        worth_font = Font(bold=True, color="8CAF7A", size=9)
+        thin       = Side(style="thin", color="2A3828")
+        border     = Border(left=thin, right=thin, top=thin, bottom=thin)
+        num_fmt4   = "#,##0.0000"
 
-    # Metrics
-    total_worth = df["TOTAL WORTH"].sum()
+        cat_colors = {
+            "beverage":"D6E8F5","beef":"F5D6D6","chicken":"FFF3D6",
+            "seafood":"D6F0F5","fresh":"D6F5E0","dry":"FFF8D6",
+            "wet":"EDD6F5","rtc":"D6E8FF","pork":"F5D6D6",
+            "meat":"F0F0F0","frozen":"D6EAF8","dessert":"FFF0D6"
+        }
+
+        MAIN_COLS  = ["ITEM","BEGINNING STOCKS","UNIT COST","UNIT OF MEASURE","CATEGORY",
+                      "ADD'L / IN","OVER","RESTAURANT","BANQUET","CAFÉ","BAR","OTHERS",
+                      "SPOILAGE","ENDING STOCKS","TOTAL WORTH OF STOCKS"]
+        WORTH_COLS = ["WORTH OF BEGINNING","WORTH OF ADD'L/IN","WORTH OF OVER",
+                      "WORTH OF RESTAURANT","WORTH OF BANQUET","WORTH OF CAFÉ",
+                      "WORTH OF BAR","WORTH OF OTHERS","WORTH OF SPOILAGE","WORTH OF ENDING"]
+
+        def col_letter(n): return get_column_letter(n)
+
+        # Running stock tracker — beginning of range = current BEGINNING_STOCKS
+        item_running = {row["ITEM"]: num(row["BEGINNING_STOCKS"]) for _, row in active.iterrows()}
+
+        def write_day_sheet(ws_out, day_str, day_label, tab_log, item_running):
+            ws_out.merge_cells("A1:O1")
+            tc = ws_out["A1"]
+            tc.value = f"{day_label} — SERVANDO MAIN WAREHOUSE INVENTORY"
+            tc.font = title_font; tc.fill = title_fill
+            tc.alignment = Alignment(horizontal="center", vertical="center")
+            ws_out.row_dimensions[1].height = 26
+
+            for ci, col in enumerate(MAIN_COLS, 1):
+                c = ws_out.cell(row=2, column=ci, value=col)
+                c.fill = hdr_fill; c.font = hdr_font
+                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                c.border = border
+            for ci, col in enumerate(WORTH_COLS, 17):
+                c = ws_out.cell(row=2, column=ci, value=col)
+                c.fill = worth_fill; c.font = worth_font
+                c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+                c.border = border
+            ws_out.row_dimensions[2].height = 38
+
+            for ri, (_, item) in enumerate(active.iterrows(), 3):
+                name = item["ITEM"]
+                cost = num(item["UNIT COST"])
+                cat  = str(item["CATEGORY"]).lower()
+                beg  = item_running.get(name, 0.0)
+
+                if not tab_log.empty:
+                    ilog   = tab_log[tab_log["ITEM"] == name]
+                    add_in = ilog["ADD_IN"].apply(num).sum()
+                    over   = ilog["OVER"].apply(num).sum()
+                    rest   = ilog["RESTAURANT"].apply(num).sum()
+                    banq   = ilog["BANQUET"].apply(num).sum()
+                    cafe   = ilog["CAFE"].apply(num).sum()
+                    bar    = ilog["BAR"].apply(num).sum()
+                    others = ilog["OTHERS"].apply(num).sum()
+                    spoil  = ilog["SPOILAGE"].apply(num).sum()
+                else:
+                    add_in=over=rest=banq=cafe=bar=others=spoil=0.0
+
+                ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+                worth  = ending * cost
+                cfill  = PatternFill("solid", fgColor=cat_colors.get(cat, "FFFFFF"))
+
+                main_vals = [name, round(beg,4), round(cost,6), item["UNIT OF MEASURE"],
+                             item["CATEGORY"], round(add_in,4), round(over,4),
+                             round(rest,4), round(banq,4), round(cafe,4), round(bar,4),
+                             round(others,4), round(spoil,4), round(ending,4), round(worth,4)]
+                worth_vals = [beg*cost, add_in*cost, over*cost, rest*cost, banq*cost,
+                              cafe*cost, bar*cost, others*cost, spoil*cost, worth]
+
+                for ci, val in enumerate(main_vals, 1):
+                    cell = ws_out.cell(row=ri, column=ci, value=val)
+                    cell.fill = cfill; cell.border = border
+                    if ci in [2,3,6,7,8,9,10,11,12,13,14,15]:
+                        cell.number_format = num_fmt4
+                        cell.alignment = Alignment(horizontal="right", vertical="center")
+                    else:
+                        cell.alignment = Alignment(vertical="center")
+
+                for ci, val in enumerate(worth_vals, 17):
+                    cell = ws_out.cell(row=ri, column=ci, value=round(val,4))
+                    cell.fill = worth_fill
+                    cell.font = Font(color="8CAF7A", size=9)
+                    cell.number_format = num_fmt4; cell.border = border
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+
+            # Totals row
+            total_row = 650
+            ws_out.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
+            ws_out.cell(row=total_row, column=1).fill = hdr_fill
+            ws_out.cell(row=total_row, column=1).border = border
+            for ci in [2,6,7,8,9,10,11,12,13,14,15]:
+                col_l = col_letter(ci)
+                cell = ws_out.cell(row=total_row, column=ci,
+                    value=f"=SUM({col_l}3:{col_l}{total_row-1})")
+                cell.fill = hdr_fill; cell.font = Font(bold=True, color="A8C896", size=9)
+                cell.number_format = num_fmt4; cell.border = border
+                cell.alignment = Alignment(horizontal="right")
+            for ci in range(17, 17+len(WORTH_COLS)):
+                col_l = col_letter(ci)
+                cell = ws_out.cell(row=total_row, column=ci,
+                    value=f"=SUM({col_l}3:{col_l}{total_row-1})")
+                cell.fill = worth_fill; cell.font = Font(bold=True, color="8CAF7A", size=9)
+                cell.number_format = num_fmt4; cell.border = border
+                cell.alignment = Alignment(horizontal="right")
+
+            col_widths = [32,13,11,14,11,11,10,12,12,10,10,10,12,14,17,3,
+                          14,13,12,14,14,12,12,12,14,14]
+            for ci, w in enumerate(col_widths, 1):
+                ws_out.column_dimensions[col_letter(ci)].width = w
+            ws_out.freeze_panes = "A3"
+
+            # Update running stock
+            for _, item in active.iterrows():
+                name = item["ITEM"]
+                beg  = item_running.get(name, 0.0)
+                if not tab_log.empty:
+                    ilog   = tab_log[tab_log["ITEM"] == name]
+                    add_in = ilog["ADD_IN"].apply(num).sum()
+                    over   = ilog["OVER"].apply(num).sum()
+                    rest   = ilog["RESTAURANT"].apply(num).sum()
+                    banq   = ilog["BANQUET"].apply(num).sum()
+                    cafe   = ilog["CAFE"].apply(num).sum()
+                    bar    = ilog["BAR"].apply(num).sum()
+                    others = ilog["OTHERS"].apply(num).sum()
+                    spoil  = ilog["SPOILAGE"].apply(num).sum()
+                else:
+                    add_in=over=rest=banq=cafe=bar=others=spoil=0.0
+                item_running[name] = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+            return item_running
+
+        # ── Write one tab per day ────────────────────────────────────────
+        for day_str in all_days:
+            try:
+                d = datetime.strptime(day_str, "%Y-%m-%d")
+                tab_name  = str(d.day)
+                day_label = d.strftime("%B %d, %Y").upper()
+            except:
+                tab_name  = day_str[-2:].lstrip("0") or "1"
+                day_label = day_str
+
+            tab_log = range_log[range_log["DATE"] == day_str] if not range_log.empty else pd.DataFrame()
+            ws_day  = wb.create_sheet(title=tab_name)
+            item_running = write_day_sheet(ws_day, day_str, day_label, tab_log, item_running)
+
+        # ── SUMMARY tab ──────────────────────────────────────────────────
+        ws_sum = wb.create_sheet(title="SUMMARY")
+        ws_sum.merge_cells("A1:O1")
+        tc = ws_sum["A1"]
+        tc.value = f"SUMMARY — {title_label} — SERVANDO MAIN WAREHOUSE INVENTORY"
+        tc.font = title_font; tc.fill = title_fill
+        tc.alignment = Alignment(horizontal="center", vertical="center")
+        ws_sum.row_dimensions[1].height = 26
+
+        for ci, col in enumerate(MAIN_COLS, 1):
+            c = ws_sum.cell(row=2, column=ci, value=col)
+            c.fill = hdr_fill; c.font = hdr_font
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            c.border = border
+        for ci, col in enumerate(WORTH_COLS, 17):
+            c = ws_sum.cell(row=2, column=ci, value=col)
+            c.fill = worth_fill; c.font = worth_font
+            c.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            c.border = border
+        ws_sum.row_dimensions[2].height = 38
+
+        for ri, (_, item) in enumerate(active.iterrows(), 3):
+            name = item["ITEM"]
+            cost = num(item["UNIT COST"])
+            cat  = str(item["CATEGORY"]).lower()
+            beg  = num(item["BEGINNING_STOCKS"])
+
+            if not range_log.empty:
+                ilog   = range_log[range_log["ITEM"] == name]
+                add_in = ilog["ADD_IN"].apply(num).sum()
+                over   = ilog["OVER"].apply(num).sum()
+                rest   = ilog["RESTAURANT"].apply(num).sum()
+                banq   = ilog["BANQUET"].apply(num).sum()
+                cafe   = ilog["CAFE"].apply(num).sum()
+                bar    = ilog["BAR"].apply(num).sum()
+                others = ilog["OTHERS"].apply(num).sum()
+                spoil  = ilog["SPOILAGE"].apply(num).sum()
+            else:
+                add_in=over=rest=banq=cafe=bar=others=spoil=0.0
+
+            ending = beg + add_in + over - rest - banq - cafe - bar - others - spoil
+            worth  = ending * cost
+            cfill  = PatternFill("solid", fgColor=cat_colors.get(cat, "FFFFFF"))
+
+            main_vals = [name, round(beg,4), round(cost,6), item["UNIT OF MEASURE"],
+                         item["CATEGORY"], round(add_in,4), round(over,4),
+                         round(rest,4), round(banq,4), round(cafe,4), round(bar,4),
+                         round(others,4), round(spoil,4), round(ending,4), round(worth,4)]
+            worth_vals = [beg*cost, add_in*cost, over*cost, rest*cost, banq*cost,
+                          cafe*cost, bar*cost, others*cost, spoil*cost, worth]
+
+            for ci, val in enumerate(main_vals, 1):
+                cell = ws_sum.cell(row=ri, column=ci, value=val)
+                cell.fill = cfill; cell.border = border
+                if ci in [2,3,6,7,8,9,10,11,12,13,14,15]:
+                    cell.number_format = num_fmt4
+                    cell.alignment = Alignment(horizontal="right", vertical="center")
+                else:
+                    cell.alignment = Alignment(vertical="center")
+            for ci, val in enumerate(worth_vals, 17):
+                cell = ws_sum.cell(row=ri, column=ci, value=round(val,4))
+                cell.fill = worth_fill
+                cell.font = Font(color="8CAF7A", size=9)
+                cell.number_format = num_fmt4; cell.border = border
+                cell.alignment = Alignment(horizontal="right", vertical="center")
+
+        total_row = 650
+        ws_sum.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
+        ws_sum.cell(row=total_row, column=1).fill = hdr_fill
+        ws_sum.cell(row=total_row, column=1).border = border
+        for ci in [2,6,7,8,9,10,11,12,13,14,15]:
+            col_l = col_letter(ci)
+            cell = ws_sum.cell(row=total_row, column=ci, value=f"=SUM({col_l}3:{col_l}{total_row-1})")
+            cell.fill = hdr_fill; cell.font = Font(bold=True, color="A8C896", size=9)
+            cell.number_format = num_fmt4; cell.border = border
+            cell.alignment = Alignment(horizontal="right")
+        for ci in range(17, 17+len(WORTH_COLS)):
+            col_l = col_letter(ci)
+            cell = ws_sum.cell(row=total_row, column=ci, value=f"=SUM({col_l}3:{col_l}{total_row-1})")
+            cell.fill = worth_fill; cell.font = Font(bold=True, color="8CAF7A", size=9)
+            cell.number_format = num_fmt4; cell.border = border
+            cell.alignment = Alignment(horizontal="right")
+
+        col_widths = [32,13,11,14,11,11,10,12,12,10,10,10,12,14,17,3,
+                      14,13,12,14,14,12,12,12,14,14]
+        for ci, w in enumerate(col_widths, 1):
+            ws_sum.column_dimensions[col_letter(ci)].width = w
+        ws_sum.freeze_panes = "A3"
+
+        if "Sheet" in wb.sheetnames:
+            del wb["Sheet"]
+
+        buf = BytesIO()
+        wb.save(buf); buf.seek(0)
+
+        st.download_button(
+            label=f"📥 Download {file_label.replace('_', ' ')}.xlsx",
+            data=buf,
+            file_name=f"{file_label}_-_Servando_Main_Warehouse.xlsx",
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        st.success(f"✅ Done! {len(all_days)} daily tabs + SUMMARY. File: {file_label} - Servando Main Warehouse.xlsx")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ══════════════════════════════════════════════════════════════════════════════
+# PAGE: SETUP
+# ══════════════════════════════════════════════════════════════════════════════
+elif page == "⚙️ Setup":
+    st.markdown('<div class="main-header"><h1>⚙️ Setup</h1><p>Initialize system · Import items</p></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Import 557 Items from May 2026 Inventory</div>', unsafe_allow_html=True)
+    st.write("This imports all your existing ingredients into the new system. Run once. Skips items that already exist.")
+
+    if st.button("🚀 Import Items", type="primary"):
+        ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+        existing = {r["ITEM"] for r in ws.get_all_records()}
+        new_rows = []
+        for item in INITIAL_ITEMS:
+            name, beginning, cost, uom, cat = item
+            if name not in existing:
+                new_rows.append([name, round(cost,6), uom, cat, round(beginning,4), "YES"])
+
+        if new_rows:
+            # Batch in groups of 100 to avoid rate limits
+            for i in range(0, len(new_rows), 100):
+                ws.append_rows(new_rows[i:i+100])
+            invalidate_cache()
+            st.success(f"✅ Imported {len(new_rows)} items!")
+        else:
+            st.info("All items already exist.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Current Status</div>', unsafe_allow_html=True)
+    items_df = load_items(SPREADSHEET_ID)
+    log_df   = load_log(SPREADSHEET_ID)
     c1, c2, c3 = st.columns(3)
-    with c1: st.metric("Month", sel_month)
-    with c2: st.metric("Total Items", len(df))
-    with c3: st.metric("Total Ending Worth", f"₱{total_worth:,.2f}")
+    with c1: st.metric("Items in Master", len(items_df))
+    with c2: st.metric("Total Transactions", len(log_df))
+    with c3: st.metric("Active Items", len(items_df[items_df["ACTIVE"]=="YES"]) if not items_df.empty else 0)
+    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown("---")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.markdown('<div class="section-title" style="color:#CC6A6A;">⚠️ Danger Zone — Reset / Clear Data</div>', unsafe_allow_html=True)
+    st.markdown('<div style="color:#CC6A6A;font-size:0.82rem;margin-bottom:1rem;">These actions are permanent and cannot be undone. Type the confirmation word before proceeding.</div>', unsafe_allow_html=True)
 
-# ══════════════════════════════════════════════════════════════════════════════
-# PAGE: ITEM HISTORY
-# ══════════════════════════════════════════════════════════════════════════════
+    # Clear Transactions only
+    st.markdown('<div class="card" style="border-color:#3A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Clear All Transactions (Keep Items)</div>', unsafe_allow_html=True)
+    st.write("Wipes the entire transaction log (deliveries, POs, adjustments). Your item list stays intact.")
+    confirm1 = st.text_input("Type **CLEAR TRANSACTIONS** to confirm", key="confirm_txn")
+    if st.button("🗑️ Clear Transactions", key="btn_clear_txn"):
+        if confirm1.strip().upper() == "CLEAR TRANSACTIONS":
+            ws = ensure_sheet(ss, LOG_SHEET, LOG_HEADERS)
+            ws.clear()
+            ws.append_row(LOG_HEADERS)
+            invalidate_cache()
+            st.success("✅ All transactions cleared. Items list is untouched.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Clear Items only
+    st.markdown('<div class="card" style="border-color:#3A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Clear All Items (Keep Transactions)</div>', unsafe_allow_html=True)
+    st.write("Wipes the entire items master list. Transaction history stays intact.")
+    confirm2 = st.text_input("Type **CLEAR ITEMS** to confirm", key="confirm_items")
+    if st.button("🗑️ Clear Items", key="btn_clear_items"):
+        if confirm2.strip().upper() == "CLEAR ITEMS":
+            ws = ensure_sheet(ss, ITEMS_SHEET, ITEMS_HEADERS)
+            ws.clear()
+            ws.append_row(ITEMS_HEADERS)
+            invalidate_cache()
+            st.success("✅ All items cleared. Transaction log is untouched.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # Full Reset
+    st.markdown('<div class="card" style="border-color:#5A1A1A;">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title" style="color:#CC6A6A;">Full Reset — Clear Everything</div>', unsafe_allow_html=True)
+    st.write("Wipes **both** the items list and all transactions. Complete fresh start.")
+    confirm3 = st.text_input("Type **FULL RESET** to confirm", key="confirm_full")
+    if st.button("💥 Full Reset", key="btn_full_reset"):
+        if confirm3.strip().upper() == "FULL RESET":
+            for sheet_name, headers in [(ITEMS_SHEET, ITEMS_HEADERS), (LOG_SHEET, LOG_HEADERS)]:
+                ws = ensure_sheet(ss, sheet_name, headers)
+                ws.clear()
+                ws.append_row(headers)
+            invalidate_cache()
+            st.success("✅ Full reset complete. Everything has been cleared.")
+        else:
+            st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
+    st.markdown('</div>', unsafe_allow_html=True)
 elif page == "🔍 Item History":
     st.markdown('<div class="main-header"><h1>🔍 Item History</h1><p>Full transaction log per item or per reference number</p></div>', unsafe_allow_html=True)
 
