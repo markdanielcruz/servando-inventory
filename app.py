@@ -1491,11 +1491,6 @@ elif page == "⬇️ Export to Excel":
             tc.alignment = Alignment(horizontal="center", vertical="center")
             ws_out.row_dimensions[1].height = 26
 
-            ws_out.merge_cells("Q2:Z2")
-            ws_out["Q2"].value = "SUMMARY (WORTH)"
-            ws_out["Q2"].font = worth_font; ws_out["Q2"].fill = worth_fill
-            ws_out["Q2"].alignment = Alignment(horizontal="center", vertical="center")
-
             for ci, col in enumerate(MAIN_COLS, 1):
                 c = ws_out.cell(row=2, column=ci, value=col)
                 c.fill = hdr_fill; c.font = hdr_font
@@ -1621,11 +1616,6 @@ elif page == "⬇️ Export to Excel":
         tc.font = title_font; tc.fill = title_fill
         tc.alignment = Alignment(horizontal="center", vertical="center")
         ws_sum.row_dimensions[1].height = 26
-
-        ws_sum.merge_cells("Q2:Z2")
-        ws_sum["Q2"].value = "SUMMARY (WORTH)"
-        ws_sum["Q2"].font = worth_font; ws_sum["Q2"].fill = worth_fill
-        ws_sum["Q2"].alignment = Alignment(horizontal="center", vertical="center")
 
         for ci, col in enumerate(MAIN_COLS, 1):
             c = ws_sum.cell(row=2, column=ci, value=col)
