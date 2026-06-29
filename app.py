@@ -814,8 +814,8 @@ def build_doc_xlsx(doc_type, ref, date_str, staff_str, meta3_label, meta3_val, r
     try:
         logo_buf = BytesIO(base64.b64decode(logo_b64_str))
         xl_logo = XLImage(logo_buf)
-        xl_logo.width = 110
-        xl_logo.height = 30
+        xl_logo.width = 220
+        xl_logo.height = 58
         xl_logo.anchor = "D1"
         ws.add_image(xl_logo)
     except Exception:
