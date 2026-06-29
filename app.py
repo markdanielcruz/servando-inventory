@@ -856,7 +856,8 @@ if page == "📊 Dashboard":
             txn = row.get("TXN_TYPE","")
             ref = row.get("REF_NUMBER","")
             icon = "📥" if txn == "DELIVERY" else ("📋" if txn == "PO" else "🔧")
-            st.markdown(f'<div class="log-entry">{icon} <strong>{row.get("ITEM","")}</strong> &nbsp;·&nbsp; {txn} {f\'<span style="color:#5A7A52;">({ref})</span>\' if ref else ""} &nbsp;·&nbsp; 👤 {row.get("STAFF","")} &nbsp;·&nbsp; 📅 {row.get("DATE","")}</div>', unsafe_allow_html=True)
+            ref_span = f'<span style="color:#5A7A52;">({ref})</span>' if ref else ""
+            st.markdown(f'<div class="log-entry">{icon} <strong>{row.get("ITEM","")}</strong> &nbsp;·&nbsp; {txn} {ref_span} &nbsp;·&nbsp; 👤 {row.get("STAFF","")}&nbsp;·&nbsp; 📅 {row.get("DATE","")}</div>', unsafe_allow_html=True)
 
     # Low / zero stock warning
     zero = active[active["CURRENT_STOCK"] <= 0]
