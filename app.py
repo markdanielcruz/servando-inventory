@@ -1767,7 +1767,7 @@ elif page == "⬇️ Export to Excel":
                     cell.alignment = Alignment(horizontal="right", vertical="center")
 
             # Totals row
-            total_row = len(active) + 3
+            total_row = 650
             ws_out.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
             ws_out.cell(row=total_row, column=1).fill = hdr_fill
             ws_out.cell(row=total_row, column=1).border = border
@@ -1891,7 +1891,7 @@ elif page == "⬇️ Export to Excel":
                 cell.number_format = num_fmt4; cell.border = border
                 cell.alignment = Alignment(horizontal="right", vertical="center")
 
-        total_row = len(active) + 3
+        total_row = 650
         ws_sum.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
         ws_sum.cell(row=total_row, column=1).fill = hdr_fill
         ws_sum.cell(row=total_row, column=1).border = border
