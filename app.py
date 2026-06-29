@@ -1002,7 +1002,8 @@ elif page == "📥 Incoming Deliveries":
     st.markdown('<div class="main-header"><h1>📥 Incoming Deliveries</h1><p>Log incoming stock from suppliers</p></div>', unsafe_allow_html=True)
 
     items_df = load_items(SPREADSHEET_ID)
-    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+    active_items = [f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})' for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()] if not items_df.empty else []
+    item_name_map = {f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})': r["ITEM"] for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()} if not items_df.empty else {}
 
     if not active_items:
         st.warning("No items found. Go to Setup first.")
@@ -1027,13 +1028,14 @@ elif page == "📥 Incoming Deliveries":
     with c2: qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="del_qty")
 
     if sel_item:
-        info = items_df[items_df["ITEM"]==sel_item].iloc[0]
-        st.markdown(f'<div class="info-box">📦 <strong>{sel_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+        _sel_item_name = item_name_map.get(sel_item, sel_item)
+        info = items_df[items_df["ITEM"]==_sel_item_name].iloc[0]
+        st.markdown(f'<div class="info-box">📦 <strong>{sel_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.3f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
 
     if st.button("➕ Add to Delivery", use_container_width=True):
         if sel_item and qty > 0:
             st.session_state.delivery_cart.append({
-                "item": sel_item,
+                "item": _sel_item_name,
                 "qty": qty,
                 "unit": info["UNIT OF MEASURE"],
                 "cost": num(info["UNIT COST"]),
@@ -1110,7 +1112,7 @@ elif page == "📥 Incoming Deliveries":
                     unit_cost = num(items_df[items_df["ITEM"]==r["ITEM"]]["UNIT COST"].values[0]) if r["ITEM"] in items_df["ITEM"].values else 0
                     uom = items_df[items_df["ITEM"]==r["ITEM"]]["UNIT OF MEASURE"].values[0] if r["ITEM"] in items_df["ITEM"].values else ""
                     val = qty * unit_cost
-                    st.markdown(f'<div class="po-item-row"><strong>{r["ITEM"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{qty:,.2f} {uom}</span> &nbsp;|&nbsp; ₱{unit_cost:.4f}/unit &nbsp;|&nbsp; ₱{val:,.2f}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="po-item-row"><strong>{r["ITEM"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{qty:,.2f} {uom}</span> &nbsp;|&nbsp; ₱{unit_cost:.3f}/unit &nbsp;|&nbsp; ₱{val:,.2f}</div>', unsafe_allow_html=True)
                     table_rows += f"<tr><td>{row_idx}</td><td>{r['ITEM']}</td><td>{uom}</td><td class='right'>{qty:,.2f}</td><td class='right'>&#8369;{unit_cost:.4f}</td><td class='right'>&#8369;{val:,.2f}</td></tr>"
 
                 st.markdown(f'<div class="info-box" style="text-align:right;">Total Value: <strong>₱{total_val:,.2f}</strong></div>', unsafe_allow_html=True)
@@ -1134,7 +1136,8 @@ elif page == "📋 Purchase Orders":
     st.markdown('<div class="main-header"><h1>📋 Purchase Orders</h1><p>Release stock to departments</p></div>', unsafe_allow_html=True)
 
     items_df = load_items(SPREADSHEET_ID)
-    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+    active_items = [f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})' for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()] if not items_df.empty else []
+    item_name_map = {f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})': r["ITEM"] for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()} if not items_df.empty else {}
 
     if not active_items:
         st.warning("No items found. Go to Setup first.")
@@ -1166,12 +1169,13 @@ elif page == "📋 Purchase Orders":
     with c2: po_qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
 
     if po_item:
-        info = items_df[items_df["ITEM"]==po_item].iloc[0]
-        st.markdown(f'<div class="info-box">📦 <strong>{po_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+        _po_item_name = item_name_map.get(po_item, po_item)
+        info = items_df[items_df["ITEM"]==_po_item_name].iloc[0]
+        st.markdown(f'<div class="info-box">📦 <strong>{po_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.3f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
 
     if st.button("➕ Add to PO", use_container_width=True):
         if po_item and po_qty > 0:
-            st.session_state.po_cart.append({"item": po_item, "qty": po_qty, "notes": "",
+            st.session_state.po_cart.append({"item": _po_item_name, "qty": po_qty, "notes": "",
                                               "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]),
                                               "dept": department})
             st.success(f"✅ {po_item} added.")
@@ -1260,7 +1264,7 @@ elif page == "📋 Purchase Orders":
                     uom = items_df[items_df["ITEM"]==r["ITEM"]]["UNIT OF MEASURE"].values[0] if r["ITEM"] in items_df["ITEM"].values else ""
                     val = qty * unit_cost
                     total_val += val
-                    st.markdown(f'<div class="po-item-row"><strong>{r["ITEM"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{qty:,.2f} {uom}</span> &nbsp;|&nbsp; ₱{unit_cost:.4f}/unit &nbsp;|&nbsp; ₱{val:,.2f} &nbsp;|&nbsp; → {dept_name}</div>', unsafe_allow_html=True)
+                    st.markdown(f'<div class="po-item-row"><strong>{r["ITEM"]}</strong> &nbsp;|&nbsp; <span style="color:#8CAF7A;">{qty:,.2f} {uom}</span> &nbsp;|&nbsp; ₱{unit_cost:.3f}/unit &nbsp;|&nbsp; ₱{val:,.2f} &nbsp;|&nbsp; → {dept_name}</div>', unsafe_allow_html=True)
                     table_rows += f"<tr><td>{row_idx}</td><td>{r['ITEM']}</td><td>{uom}</td><td class='right'>{qty:,.2f}</td><td class='right'>&#8369;{unit_cost:.4f}</td><td class='right'>&#8369;{val:,.2f}</td><td>{dept_name}</td></tr>"
 
                 st.markdown(f'<div class="info-box" style="text-align:right;">Total Value: <strong>₱{total_val:,.2f}</strong></div>', unsafe_allow_html=True)
@@ -1285,7 +1289,8 @@ elif page == "🔧 Stock Adjustment":
     st.markdown('<div class="main-header"><h1>🔧 Stock Adjustment</h1><p>Correct stock levels · Spoilage · Count adjustments</p></div>', unsafe_allow_html=True)
 
     items_df = load_items(SPREADSHEET_ID)
-    active_items = items_df[items_df["ACTIVE"]=="YES"]["ITEM"].tolist() if not items_df.empty else []
+    active_items = [f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})' for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()] if not items_df.empty else []
+    item_name_map = {f'{r["ITEM"]} ({r["UNIT OF MEASURE"]})': r["ITEM"] for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()} if not items_df.empty else {}
 
     if not active_items:
         st.warning("No items found."); st.stop()
@@ -1311,7 +1316,7 @@ elif page == "🔧 Stock Adjustment":
 
     if adj_item:
         info = items_df[items_df["ITEM"]==adj_item].iloc[0]
-        st.markdown(f'<div class="info-box">📦 <strong>{adj_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="info-box">📦 <strong>{adj_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.3f}/unit</div>', unsafe_allow_html=True)
 
     if st.button("➕ Add Adjustment", use_container_width=True):
         if not adj_notes.strip():
@@ -1463,7 +1468,7 @@ elif page == "🔍 Item History":
 
             if sel:
                 info = items_df[items_df["ITEM"]==sel].iloc[0]
-                st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.4f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()} &nbsp;|&nbsp; Current Beginning: <strong>{num(info["BEGINNING_STOCKS"]):,.2f}</strong></div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="info-box">📦 <strong>{sel}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.3f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()} &nbsp;|&nbsp; Current Beginning: <strong>{num(info["BEGINNING_STOCKS"]):,.2f}</strong></div>', unsafe_allow_html=True)
 
                 if log_df.empty:
                     st.info("No transactions yet.")
