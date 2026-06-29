@@ -1262,12 +1262,15 @@ elif page == "🔍 Item History":
                                        ilog["CAFE"].apply(num) + ilog["BAR"].apply(num) +
                                        ilog["OTHERS"].apply(num)).sum()
                         total_spoil = ilog["SPOILAGE"].apply(num).sum()
+                        beginning   = num(info["BEGINNING_STOCKS"])
+                        ending_stock = beginning + total_in + total_over - total_out - total_spoil
 
-                        c1,c2,c3,c4 = st.columns(4)
+                        c1,c2,c3,c4,c5 = st.columns(5)
                         with c1: st.metric("Total Incoming", f"{total_in:,.2f}")
                         with c2: st.metric("Total Released (PO)", f"{total_out:,.2f}")
                         with c3: st.metric("Total Spoilage", f"{total_spoil:,.2f}")
-                        with c4: st.metric("Total Transactions", len(ilog))
+                        with c4: st.metric("Ending Stock", f"{ending_stock:,.2f}")
+                        with c5: st.metric("Total Transactions", len(ilog))
 
                         st.markdown("---")
 
