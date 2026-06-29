@@ -184,7 +184,6 @@ INITIAL_ITEMS = [
 ('Bacardi - Gold Rum 750ml', 1500.0, 0.9333333333333333, 'ml', 'beverage'),
 ('Bacardi - Premium Black 750ml', 3000.0, 1.1666666666666667, 'ml', 'beverage'),
 ('Bacardi - Superior White 750 ml', 1500.0, 2.3066666666666666, 'ml', 'beverage'),
-('Baguio Beans', 0.0, 0.18, 'gram', 'fresh'),
 ("Bailey's Original 700 ml", 3500.0, 1.1428571428571428, 'bottle', 'beverage'),
 ("Baker's Best Margarine 225g", 4050.0, 0.28, 'gram', 'wet'),
 ('Baking Powder', 1000.0, 0.22, 'gram', 'dry'),
@@ -907,8 +906,13 @@ elif page == "📥 Incoming Deliveries":
 
     if st.button("➕ Add to Delivery", use_container_width=True):
         if sel_item and qty > 0:
-            st.session_state.delivery_cart.append({"item": sel_item, "qty": qty, "notes": notes,
-                                                    "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]), "notes": ""})
+            st.session_state.delivery_cart.append({
+                "item": sel_item,
+                "qty": qty,
+                "unit": info["UNIT OF MEASURE"],
+                "cost": num(info["UNIT COST"]),
+                "notes": ""
+            })
             st.success(f"✅ {sel_item} added.")
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
@@ -1726,6 +1730,7 @@ elif page == "⬇️ Export to Excel":
         )
         st.success(f"✅ Done! {len(all_days)} daily tabs + SUMMARY. File: {file_label} - Servando Main Warehouse.xlsx")
     st.markdown('</div>', unsafe_allow_html=True)
+
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: SETUP
 # ══════════════════════════════════════════════════════════════════════════════
