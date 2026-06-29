@@ -856,11 +856,7 @@ if page == "📊 Dashboard":
             txn = row.get("TXN_TYPE","")
             ref = row.get("REF_NUMBER","")
             icon = "📥" if txn == "DELIVERY" else ("📋" if txn == "PO" else "🔧")
-            st.markdown(f"""
-            <div class="log-entry">
-                {icon} <strong>{row.get('ITEM','')}</strong> &nbsp;·&nbsp; {txn} {f'<span style="color:#5A7A52;">({ref})</span>' if ref else ''}
-                &nbsp;·&nbsp; 👤 {row.get('STAFF','')} &nbsp;·&nbsp; 📅 {row.get('DATE','')}
-            </div>""", unsafe_allow_html=True)
+            st.markdown(f'<div class="log-entry">{icon} <strong>{row.get("ITEM","")}</strong> &nbsp;·&nbsp; {txn} {f\'<span style="color:#5A7A52;">({ref})</span>\' if ref else ""} &nbsp;·&nbsp; 👤 {row.get("STAFF","")} &nbsp;·&nbsp; 📅 {row.get("DATE","")}</div>', unsafe_allow_html=True)
 
     # Low / zero stock warning
     zero = active[active["CURRENT_STOCK"] <= 0]
@@ -1300,14 +1296,7 @@ elif page == "🔍 Item History":
                                     if v: parts.append(f"<strong style='color:{color};'>{label}:</strong> {v:,.2f}")
                                 _notes_val = str(row.get("NOTES", "")).strip()
                                 notes_str = f'<div style="color:#5A7A52;font-size:0.78rem;margin-top:3px;">📝 {_notes_val}</div>' if _notes_val else ""
-                                st.markdown(f"""<div class="log-entry" style="border-left-color:{color};">
-                                    <div style="display:flex;justify-content:space-between;align-items:center;">
-                                        <span>📅 <strong>{date_str}</strong> &nbsp;·&nbsp; 👤 {staff}</span>
-                                        <span style="color:#3A5238;font-size:0.75rem;">{ref}</span>
-                                    </div>
-                                    <div style="margin-top:5px;">{' &nbsp;&nbsp; '.join(parts) if parts else '—'}</div>
-                                    {notes_str}
-                                </div>""", unsafe_allow_html=True)
+                                st.markdown(f'<div class="log-entry" style="border-left-color:{color};"><div style="display:flex;justify-content:space-between;align-items:center;"><span>📅 <strong>{date_str}</strong> &nbsp;·&nbsp; 👤 {staff}</span><span style="color:#3A5238;font-size:0.75rem;">{ref}</span></div><div style="margin-top:5px;">{" &nbsp;&nbsp; ".join(parts) if parts else "—"}</div>{notes_str}</div>', unsafe_allow_html=True)
 
     with tab2:
         ref_search = st.text_input("Search Reference #", placeholder="e.g. PO-20260628, DEL-..., ADJ-...")
@@ -1327,10 +1316,7 @@ elif page == "🔍 Item History":
                                            ("CAFE","Café"),("BAR","Bar"),("OTHERS","Others"),("SPOILAGE","Spoilage")]:
                             v = num(row.get(col,0))
                             if v: parts.append(f"{label}: <strong>{v:,.2f}</strong>")
-                        st.markdown(f"""<div class="log-entry">
-                            📦 <strong>{row.get('ITEM','')}</strong>
-                            <div style="margin-top:3px;">{' &nbsp;·&nbsp; '.join(parts) if parts else '—'}</div>
-                        </div>""", unsafe_allow_html=True)
+                        st.markdown(f'<div class="log-entry">📦 <strong>{row.get("ITEM","")}</strong><div style="margin-top:3px;">{" &nbsp;·&nbsp; ".join(parts) if parts else "—"}</div></div>', unsafe_allow_html=True)
 
 # ══════════════════════════════════════════════════════════════════════════════
 # PAGE: ITEMS MASTER
