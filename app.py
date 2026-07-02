@@ -1,4 +1,5 @@
 import streamlit as st
+import re
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
@@ -710,6 +711,90 @@ elif page == "📋 Purchase Orders":
                                               "dept": department})
             st.success(f"✅ {po_item} added.")
             st.rerun()
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    # ── Batch Add (Paste List) ───────────────────────────────────────────────
+    st.markdown('<div class="card">', unsafe_allow_html=True)
+    st.markdown('<div class="section-title">Batch Add (Paste List)</div>', unsafe_allow_html=True)
+    st.caption(f"One item per line: **Item Name, Quantity** — e.g. `Chicken Breast, 5`. Everything below gets added to the department selected above (**{department}**).")
+    batch_text = st.text_area("Paste your list", height=140, key="po_batch_text",
+                               placeholder="Chicken Breast, 5\nRice, 10\nCooking Oil, 3", label_visibility="collapsed")
+
+    if st.button("🔍 Parse List", key="po_batch_parse_btn"):
+        # clear any leftover widget state from a previous parse
+        for k in list(st.session_state.keys()):
+            if k.startswith("po_batch_inc_") or k.startswith("po_batch_item_") or k.startswith("po_batch_qty_"):
+                del st.session_state[k]
+
+        active_df = items_df[items_df["ACTIVE"] == "YES"]
+        parsed = []
+        for raw_line in batch_text.splitlines():
+            line = raw_line.strip()
+            if not line:
+                continue
+            parts = re.split(r'[,\t]', line, maxsplit=1)
+            if len(parts) < 2:
+                parsed.append({"raw": line, "qty": 1.0, "matched_item": None})
+                continue
+            name_in = parts[0].strip()
+            qty_m = re.search(r'[\d.]+', parts[1])
+            qty_val = float(qty_m.group()) if qty_m else 1.0
+            exact = active_df[active_df["ITEM"].str.lower() == name_in.lower()]
+            if not exact.empty:
+                matched = exact.iloc[0]["ITEM"]
+            else:
+                contains = active_df[active_df["ITEM"].str.lower().str.contains(re.escape(name_in.lower()), na=False)]
+                matched = contains.iloc[0]["ITEM"] if len(contains) == 1 else None
+            parsed.append({"raw": line, "qty": qty_val, "matched_item": matched})
+
+        if not parsed:
+            st.warning("Nothing to parse — paste at least one line like `Item Name, Quantity`.")
+        else:
+            st.session_state.po_batch_parsed = parsed
+
+    if st.session_state.get("po_batch_parsed"):
+        st.markdown("---")
+        st.markdown(f"**Review {len(st.session_state.po_batch_parsed)} parsed line(s)** — fix any unmatched items below, uncheck to skip a line, then add.")
+        active_item_names = items_df[items_df["ACTIVE"] == "YES"]["ITEM"].tolist()
+
+        for idx, row in enumerate(st.session_state.po_batch_parsed):
+            c0, c1, c2, c3 = st.columns([0.5, 3, 1.3, 1.4])
+            with c0:
+                st.checkbox("", value=row["matched_item"] is not None, key=f"po_batch_inc_{idx}", label_visibility="collapsed")
+            with c1:
+                default_idx = active_item_names.index(row["matched_item"]) if row["matched_item"] in active_item_names else 0
+                st.selectbox("Item", active_item_names, index=default_idx, key=f"po_batch_item_{idx}", label_visibility="collapsed")
+            with c2:
+                st.number_input("Qty", min_value=0.0, value=float(row["qty"]), step=0.01, format="%.2f", key=f"po_batch_qty_{idx}", label_visibility="collapsed")
+            with c3:
+                ok = row["matched_item"] is not None
+                st.markdown(f'<div style="padding-top:8px;font-size:0.78rem;color:{"#8CAF7A" if ok else "#C4A840"};">{"✅ matched" if ok else "⚠️ check item"}</div>', unsafe_allow_html=True)
+            st.caption(f'from: "{row["raw"]}"')
+
+        bc1, bc2 = st.columns([1, 2])
+        with bc1:
+            if st.button("🗑️ Discard Parsed List", key="po_batch_discard"):
+                del st.session_state.po_batch_parsed
+                st.rerun()
+        with bc2:
+            if st.button("➕ Add All Checked to PO", type="primary", use_container_width=True, key="po_batch_add_all"):
+                added = 0
+                for idx in range(len(st.session_state.po_batch_parsed)):
+                    if st.session_state.get(f"po_batch_inc_{idx}") and st.session_state.get(f"po_batch_qty_{idx}", 0) > 0:
+                        chosen_item = st.session_state.get(f"po_batch_item_{idx}")
+                        item_row = items_df[items_df["ITEM"] == chosen_item].iloc[0]
+                        st.session_state.po_cart.append({
+                            "item": chosen_item,
+                            "qty": st.session_state.get(f"po_batch_qty_{idx}"),
+                            "notes": "",
+                            "unit": item_row["UNIT OF MEASURE"],
+                            "cost": num(item_row["UNIT COST"]),
+                            "dept": department
+                        })
+                        added += 1
+                del st.session_state.po_batch_parsed
+                st.success(f"✅ {added} item(s) added to PO from batch list.")
+                st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     if st.session_state.po_cart:
