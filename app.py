@@ -1494,6 +1494,22 @@ elif page == "⬇️ Export to Excel":
                     cell.alignment = Alignment(horizontal="right", vertical="center")
 
             total_row = 650
+            marker_row = 3 + len(active)
+            if marker_row < total_row:
+                ws_out.merge_cells(start_row=marker_row, start_column=1, end_row=marker_row, end_column=15)
+                mcell = ws_out.cell(row=marker_row, column=1)
+                mcell.value = f"⬇ TOTAL is at row {total_row} — scroll down ⬇"
+                mcell.font = Font(italic=True, bold=True, color="C4A840", size=9)
+                mcell.alignment = Alignment(horizontal="center", vertical="center")
+
+                ws_out.merge_cells(start_row=marker_row, start_column=17, end_row=marker_row, end_column=17 + len(WORTH_COLS) - 1)
+                mcell2 = ws_out.cell(row=marker_row, column=17)
+                mcell2.value = f"⬇ TOTAL is at row {total_row} — scroll down ⬇"
+                mcell2.font = Font(italic=True, bold=True, color="8CAF7A", size=9)
+                mcell2.fill = worth_fill
+                mcell2.alignment = Alignment(horizontal="center", vertical="center")
+
+                ws_out.row_dimensions[marker_row].height = 16
             ws_out.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
             ws_out.cell(row=total_row, column=1).fill = hdr_fill
             ws_out.cell(row=total_row, column=1).border = border
@@ -1615,6 +1631,22 @@ elif page == "⬇️ Export to Excel":
                 cell.alignment = Alignment(horizontal="right", vertical="center")
 
         total_row = 650
+        marker_row = 3 + len(active)
+        if marker_row < total_row:
+            ws_sum.merge_cells(start_row=marker_row, start_column=1, end_row=marker_row, end_column=15)
+            mcell = ws_sum.cell(row=marker_row, column=1)
+            mcell.value = f"⬇ TOTAL is at row {total_row} — scroll down ⬇"
+            mcell.font = Font(italic=True, bold=True, color="C4A840", size=9)
+            mcell.alignment = Alignment(horizontal="center", vertical="center")
+
+            ws_sum.merge_cells(start_row=marker_row, start_column=17, end_row=marker_row, end_column=17 + len(WORTH_COLS) - 1)
+            mcell2 = ws_sum.cell(row=marker_row, column=17)
+            mcell2.value = f"⬇ TOTAL is at row {total_row} — scroll down ⬇"
+            mcell2.font = Font(italic=True, bold=True, color="8CAF7A", size=9)
+            mcell2.fill = worth_fill
+            mcell2.alignment = Alignment(horizontal="center", vertical="center")
+
+            ws_sum.row_dimensions[marker_row].height = 16
         ws_sum.cell(row=total_row, column=1, value="TOTAL").font = Font(bold=True, color="FFFFFF")
         ws_sum.cell(row=total_row, column=1).fill = hdr_fill
         ws_sum.cell(row=total_row, column=1).border = border
