@@ -1,5 +1,4 @@
 import streamlit as st
-import re
 import gspread
 from google.oauth2.service_account import Credentials
 from datetime import datetime, date
@@ -480,31 +479,54 @@ elif page == "📥 Incoming Deliveries":
     with c2: staff_name = st.text_input("👤 Received By", placeholder="Your name", key="del_staff")
     st.markdown('</div>', unsafe_allow_html=True)
 
+    active_item_names_del = items_df[items_df["ACTIVE"] == "YES"]["ITEM"].tolist()
+    item_unit_map_del = {r["ITEM"]: r["UNIT OF MEASURE"] for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()}
+    item_cost_map_del = {r["ITEM"]: num(r["UNIT COST"]) for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()}
+
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Add Item to Delivery</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([3,1])
-    with c1: sel_item = st.selectbox("Select Item", active_items, key="del_item")
-    with c2: qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="del_qty")
+    st.markdown('<div class="section-title">Add Items to Delivery</div>', unsafe_allow_html=True)
+    st.caption("Pick an item and quantity per row. Use the **+** at the bottom of the table to add more rows.")
 
-    if sel_item:
-        _sel_item_name = item_name_map.get(sel_item, sel_item)
-        _del_matches = items_df[items_df["ITEM"]==_sel_item_name]
-        if _del_matches.empty:
-            st.error(f"'{sel_item}' was not found in Items Master (it may have been renamed or removed). Please refresh the page or check the sheet.")
-            st.stop()
-        info = _del_matches.iloc[0]
-        st.markdown(f'<div class="info-box">📦 <strong>{sel_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.2f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+    if "delivery_table_df" not in st.session_state:
+        st.session_state.delivery_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
 
-    if st.button("➕ Add to Delivery", use_container_width=True):
-        if sel_item and qty > 0:
-            st.session_state.delivery_cart.append({
-                "item": _sel_item_name,
-                "qty": qty,
-                "unit": info["UNIT OF MEASURE"],
-                "cost": num(info["UNIT COST"]),
-                "notes": ""
-            })
-            st.success(f"✅ {sel_item} added.")
+    delivery_table_edited = st.data_editor(
+        st.session_state.delivery_table_df,
+        column_config={
+            "Item": st.column_config.SelectboxColumn("Item", options=active_item_names_del, required=False, width="large"),
+            "Quantity": st.column_config.NumberColumn("Quantity", min_value=0.0, step=0.01, format="%.2f", width="small"),
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="delivery_table_editor",
+    )
+
+    if st.button("🚀 Produce Delivery", type="primary", use_container_width=True):
+        added, skipped = 0, 0
+        for _, r in delivery_table_edited.iterrows():
+            item_name = r.get("Item")
+            qty = r.get("Quantity")
+            if item_name and pd.notna(qty) and qty > 0:
+                st.session_state.delivery_cart.append({
+                    "item": item_name,
+                    "qty": float(qty),
+                    "unit": item_unit_map_del.get(item_name, ""),
+                    "cost": item_cost_map_del.get(item_name, 0.0),
+                    "notes": ""
+                })
+                added += 1
+            elif item_name or (pd.notna(qty) and qty > 0):
+                skipped += 1  # row half-filled (item without qty, or qty without item)
+
+        if added == 0:
+            st.warning("Fill in at least one row with both an item and a quantity.")
+        else:
+            st.session_state.delivery_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+            msg = f"✅ {added} item(s) added to delivery."
+            if skipped:
+                msg += f" ({skipped} row(s) skipped — missing item or quantity.)"
+            st.success(msg)
             st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
@@ -689,112 +711,56 @@ elif page == "📋 Purchase Orders":
         department = dept_choice
     st.markdown('</div>', unsafe_allow_html=True)
 
+    active_item_names = items_df[items_df["ACTIVE"] == "YES"]["ITEM"].tolist()
+    item_unit_map = {r["ITEM"]: r["UNIT OF MEASURE"] for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()}
+    item_cost_map = {r["ITEM"]: num(r["UNIT COST"]) for _, r in items_df[items_df["ACTIVE"]=="YES"].iterrows()}
+
     st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Add Item to PO</div>', unsafe_allow_html=True)
-    c1, c2 = st.columns([3,1])
-    with c1: po_item = st.selectbox("Select Item", active_items, key="po_item")
-    with c2: po_qty = st.number_input("Quantity", min_value=0.01, step=0.01, format="%.2f", key="po_qty")
+    st.markdown('<div class="section-title">Add Items to PO</div>', unsafe_allow_html=True)
+    st.caption(f"Pick an item and quantity per row. Use the **+** at the bottom of the table to add more rows. All rows go to the department selected above (**{department}**).")
 
-    if po_item:
-        _po_item_name = item_name_map.get(po_item, po_item)
-        _po_matches = items_df[items_df["ITEM"]==_po_item_name]
-        if _po_matches.empty:
-            st.error(f"'{po_item}' was not found in Items Master (it may have been renamed or removed). Please refresh the page or check the sheet.")
-            st.stop()
-        info = _po_matches.iloc[0]
-        st.markdown(f'<div class="info-box">📦 <strong>{po_item}</strong> &nbsp;|&nbsp; {info["UNIT OF MEASURE"]} &nbsp;|&nbsp; ₱{num(info["UNIT COST"]):.2f}/unit &nbsp;|&nbsp; {info["CATEGORY"].upper()}</div>', unsafe_allow_html=True)
+    if "po_table_df" not in st.session_state:
+        st.session_state.po_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
 
-    if st.button("➕ Add to PO", use_container_width=True):
-        if po_item and po_qty > 0:
-            st.session_state.po_cart.append({"item": _po_item_name, "qty": po_qty, "notes": "",
-                                              "unit": info["UNIT OF MEASURE"], "cost": num(info["UNIT COST"]),
-                                              "dept": department})
-            st.success(f"✅ {po_item} added.")
-            st.rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
+    po_table_edited = st.data_editor(
+        st.session_state.po_table_df,
+        column_config={
+            "Item": st.column_config.SelectboxColumn("Item", options=active_item_names, required=False, width="large"),
+            "Quantity": st.column_config.NumberColumn("Quantity", min_value=0.0, step=0.01, format="%.2f", width="small"),
+        },
+        num_rows="dynamic",
+        use_container_width=True,
+        hide_index=True,
+        key="po_table_editor",
+    )
 
-    # ── Batch Add (Paste List) ───────────────────────────────────────────────
-    st.markdown('<div class="card">', unsafe_allow_html=True)
-    st.markdown('<div class="section-title">Batch Add (Paste List)</div>', unsafe_allow_html=True)
-    st.caption(f"One item per line: **Item Name, Quantity** — e.g. `Chicken Breast, 5`. Everything below gets added to the department selected above (**{department}**).")
-    batch_text = st.text_area("Paste your list", height=140, key="po_batch_text",
-                               placeholder="Chicken Breast, 5\nRice, 10\nCooking Oil, 3", label_visibility="collapsed")
+    if st.button("🚀 Produce PO", type="primary", use_container_width=True):
+        added, skipped = 0, 0
+        for _, r in po_table_edited.iterrows():
+            item_name = r.get("Item")
+            qty = r.get("Quantity")
+            if item_name and pd.notna(qty) and qty > 0:
+                st.session_state.po_cart.append({
+                    "item": item_name,
+                    "qty": float(qty),
+                    "notes": "",
+                    "unit": item_unit_map.get(item_name, ""),
+                    "cost": item_cost_map.get(item_name, 0.0),
+                    "dept": department
+                })
+                added += 1
+            elif item_name or (pd.notna(qty) and qty > 0):
+                skipped += 1  # row half-filled (item without qty, or qty without item)
 
-    if st.button("🔍 Parse List", key="po_batch_parse_btn"):
-        # clear any leftover widget state from a previous parse
-        for k in list(st.session_state.keys()):
-            if k.startswith("po_batch_inc_") or k.startswith("po_batch_item_") or k.startswith("po_batch_qty_"):
-                del st.session_state[k]
-
-        active_df = items_df[items_df["ACTIVE"] == "YES"]
-        parsed = []
-        for raw_line in batch_text.splitlines():
-            line = raw_line.strip()
-            if not line:
-                continue
-            parts = re.split(r'[,\t]', line, maxsplit=1)
-            if len(parts) < 2:
-                parsed.append({"raw": line, "qty": 1.0, "matched_item": None})
-                continue
-            name_in = parts[0].strip()
-            qty_m = re.search(r'[\d.]+', parts[1])
-            qty_val = float(qty_m.group()) if qty_m else 1.0
-            exact = active_df[active_df["ITEM"].str.lower() == name_in.lower()]
-            if not exact.empty:
-                matched = exact.iloc[0]["ITEM"]
-            else:
-                contains = active_df[active_df["ITEM"].str.lower().str.contains(re.escape(name_in.lower()), na=False)]
-                matched = contains.iloc[0]["ITEM"] if len(contains) == 1 else None
-            parsed.append({"raw": line, "qty": qty_val, "matched_item": matched})
-
-        if not parsed:
-            st.warning("Nothing to parse — paste at least one line like `Item Name, Quantity`.")
+        if added == 0:
+            st.warning("Fill in at least one row with both an item and a quantity.")
         else:
-            st.session_state.po_batch_parsed = parsed
-
-    if st.session_state.get("po_batch_parsed"):
-        st.markdown("---")
-        st.markdown(f"**Review {len(st.session_state.po_batch_parsed)} parsed line(s)** — fix any unmatched items below, uncheck to skip a line, then add.")
-        active_item_names = items_df[items_df["ACTIVE"] == "YES"]["ITEM"].tolist()
-
-        for idx, row in enumerate(st.session_state.po_batch_parsed):
-            c0, c1, c2, c3 = st.columns([0.5, 3, 1.3, 1.4])
-            with c0:
-                st.checkbox("", value=row["matched_item"] is not None, key=f"po_batch_inc_{idx}", label_visibility="collapsed")
-            with c1:
-                default_idx = active_item_names.index(row["matched_item"]) if row["matched_item"] in active_item_names else 0
-                st.selectbox("Item", active_item_names, index=default_idx, key=f"po_batch_item_{idx}", label_visibility="collapsed")
-            with c2:
-                st.number_input("Qty", min_value=0.0, value=float(row["qty"]), step=0.01, format="%.2f", key=f"po_batch_qty_{idx}", label_visibility="collapsed")
-            with c3:
-                ok = row["matched_item"] is not None
-                st.markdown(f'<div style="padding-top:8px;font-size:0.78rem;color:{"#8CAF7A" if ok else "#C4A840"};">{"✅ matched" if ok else "⚠️ check item"}</div>', unsafe_allow_html=True)
-            st.caption(f'from: "{row["raw"]}"')
-
-        bc1, bc2 = st.columns([1, 2])
-        with bc1:
-            if st.button("🗑️ Discard Parsed List", key="po_batch_discard"):
-                del st.session_state.po_batch_parsed
-                st.rerun()
-        with bc2:
-            if st.button("➕ Add All Checked to PO", type="primary", use_container_width=True, key="po_batch_add_all"):
-                added = 0
-                for idx in range(len(st.session_state.po_batch_parsed)):
-                    if st.session_state.get(f"po_batch_inc_{idx}") and st.session_state.get(f"po_batch_qty_{idx}", 0) > 0:
-                        chosen_item = st.session_state.get(f"po_batch_item_{idx}")
-                        item_row = items_df[items_df["ITEM"] == chosen_item].iloc[0]
-                        st.session_state.po_cart.append({
-                            "item": chosen_item,
-                            "qty": st.session_state.get(f"po_batch_qty_{idx}"),
-                            "notes": "",
-                            "unit": item_row["UNIT OF MEASURE"],
-                            "cost": num(item_row["UNIT COST"]),
-                            "dept": department
-                        })
-                        added += 1
-                del st.session_state.po_batch_parsed
-                st.success(f"✅ {added} item(s) added to PO from batch list.")
-                st.rerun()
+            st.session_state.po_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+            msg = f"✅ {added} item(s) added to PO."
+            if skipped:
+                msg += f" ({skipped} row(s) skipped — missing item or quantity.)"
+            st.success(msg)
+            st.rerun()
     st.markdown('</div>', unsafe_allow_html=True)
 
     if st.session_state.po_cart:
