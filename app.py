@@ -488,12 +488,16 @@ elif page == "📥 Incoming Deliveries":
     st.caption("Pick an item and quantity per row. Use the **+** at the bottom of the table to add more rows.")
 
     if "delivery_table_df" not in st.session_state:
-        st.session_state.delivery_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+        st.session_state.delivery_table_df = pd.DataFrame({
+            "Item": [None] * 6, "Unit": [""] * 6, "Unit Cost": [0.0] * 6, "Quantity": [0.0] * 6
+        })
 
     delivery_table_edited = st.data_editor(
         st.session_state.delivery_table_df,
         column_config={
             "Item": st.column_config.SelectboxColumn("Item", options=active_item_names_del, required=False, width="large"),
+            "Unit": st.column_config.TextColumn("Unit", disabled=True, width="small"),
+            "Unit Cost": st.column_config.NumberColumn("Unit Cost (₱)", disabled=True, format="₱%.2f", width="small"),
             "Quantity": st.column_config.NumberColumn("Quantity", min_value=0.0, step=0.01, format="%.2f", width="small"),
         },
         num_rows="dynamic",
@@ -501,6 +505,16 @@ elif page == "📥 Incoming Deliveries":
         hide_index=True,
         key="delivery_table_editor",
     )
+
+    # Keep Unit / Unit Cost in sync with whatever Item is picked on each row
+    delivery_table_recomputed = delivery_table_edited.copy()
+    delivery_table_recomputed["Unit"] = delivery_table_recomputed["Item"].map(item_unit_map_del).fillna("")
+    delivery_table_recomputed["Unit Cost"] = delivery_table_recomputed["Item"].map(item_cost_map_del).fillna(0.0).astype(float).round(6)
+    _current_display_del = delivery_table_edited[["Unit", "Unit Cost"]].fillna({"Unit": "", "Unit Cost": 0.0})
+    _new_display_del = delivery_table_recomputed[["Unit", "Unit Cost"]]
+    if not _current_display_del.reset_index(drop=True).equals(_new_display_del.reset_index(drop=True)):
+        st.session_state.delivery_table_df = delivery_table_recomputed
+        st.rerun()
 
     if st.button("🚀 Produce Delivery", type="primary", use_container_width=True):
         added, skipped = 0, 0
@@ -522,7 +536,9 @@ elif page == "📥 Incoming Deliveries":
         if added == 0:
             st.warning("Fill in at least one row with both an item and a quantity.")
         else:
-            st.session_state.delivery_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+            st.session_state.delivery_table_df = pd.DataFrame({
+                "Item": [None] * 6, "Unit": [""] * 6, "Unit Cost": [0.0] * 6, "Quantity": [0.0] * 6
+            })
             msg = f"✅ {added} item(s) added to delivery."
             if skipped:
                 msg += f" ({skipped} row(s) skipped — missing item or quantity.)"
@@ -720,12 +736,16 @@ elif page == "📋 Purchase Orders":
     st.caption(f"Pick an item and quantity per row. Use the **+** at the bottom of the table to add more rows. All rows go to the department selected above (**{department}**).")
 
     if "po_table_df" not in st.session_state:
-        st.session_state.po_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+        st.session_state.po_table_df = pd.DataFrame({
+            "Item": [None] * 6, "Unit": [""] * 6, "Unit Cost": [0.0] * 6, "Quantity": [0.0] * 6
+        })
 
     po_table_edited = st.data_editor(
         st.session_state.po_table_df,
         column_config={
             "Item": st.column_config.SelectboxColumn("Item", options=active_item_names, required=False, width="large"),
+            "Unit": st.column_config.TextColumn("Unit", disabled=True, width="small"),
+            "Unit Cost": st.column_config.NumberColumn("Unit Cost (₱)", disabled=True, format="₱%.2f", width="small"),
             "Quantity": st.column_config.NumberColumn("Quantity", min_value=0.0, step=0.01, format="%.2f", width="small"),
         },
         num_rows="dynamic",
@@ -733,6 +753,16 @@ elif page == "📋 Purchase Orders":
         hide_index=True,
         key="po_table_editor",
     )
+
+    # Keep Unit / Unit Cost in sync with whatever Item is picked on each row
+    po_table_recomputed = po_table_edited.copy()
+    po_table_recomputed["Unit"] = po_table_recomputed["Item"].map(item_unit_map).fillna("")
+    po_table_recomputed["Unit Cost"] = po_table_recomputed["Item"].map(item_cost_map).fillna(0.0).astype(float).round(6)
+    _current_display = po_table_edited[["Unit", "Unit Cost"]].fillna({"Unit": "", "Unit Cost": 0.0})
+    _new_display = po_table_recomputed[["Unit", "Unit Cost"]]
+    if not _current_display.reset_index(drop=True).equals(_new_display.reset_index(drop=True)):
+        st.session_state.po_table_df = po_table_recomputed
+        st.rerun()
 
     if st.button("🚀 Produce PO", type="primary", use_container_width=True):
         added, skipped = 0, 0
@@ -755,7 +785,9 @@ elif page == "📋 Purchase Orders":
         if added == 0:
             st.warning("Fill in at least one row with both an item and a quantity.")
         else:
-            st.session_state.po_table_df = pd.DataFrame({"Item": [None] * 6, "Quantity": [0.0] * 6})
+            st.session_state.po_table_df = pd.DataFrame({
+                "Item": [None] * 6, "Unit": [""] * 6, "Unit Cost": [0.0] * 6, "Quantity": [0.0] * 6
+            })
             msg = f"✅ {added} item(s) added to PO."
             if skipped:
                 msg += f" ({skipped} row(s) skipped — missing item or quantity.)"
