@@ -618,8 +618,8 @@ elif page == "📥 Incoming Deliveries":
             st.info("No past deliveries yet.")
         else:
             past_refs = sorted(del_log["REF_NUMBER"].unique().tolist(), reverse=True)
-            sel_ref = st.selectbox("Select Delivery Reference", past_refs, key="past_del_ref")
-            if sel_ref:
+            sel_ref = st.selectbox("Select Delivery Reference", ["— Select a Delivery —"] + past_refs, key="past_del_ref")
+            if sel_ref and sel_ref != "— Select a Delivery —":
                 ref_rows = del_log[del_log["REF_NUMBER"] == sel_ref]
                 first = ref_rows.iloc[0]
                 total_val = sum(num(r["ADD_IN"]) * num(items_df[items_df["ITEM"]==r["ITEM"]]["UNIT COST"].values[0]) if r["ITEM"] in items_df["ITEM"].values else 0 for _, r in ref_rows.iterrows())
@@ -873,8 +873,8 @@ elif page == "📋 Purchase Orders":
             st.info("No past purchase orders yet.")
         else:
             past_po_refs = sorted(po_log["REF_NUMBER"].unique().tolist(), reverse=True)
-            sel_po_ref = st.selectbox("Select PO Reference", past_po_refs, key="past_po_ref")
-            if sel_po_ref:
+            sel_po_ref = st.selectbox("Select PO Reference", ["— Select a PO —"] + past_po_refs, key="past_po_ref")
+            if sel_po_ref and sel_po_ref != "— Select a PO —":
                 ref_rows = po_log[po_log["REF_NUMBER"] == sel_po_ref]
                 first = ref_rows.iloc[0]
                 dept_cols = ["RESTO","CAFE","BAR","KITCHEN_ALACARTE","KITCHEN_BANQUET","OTHERS"]
@@ -1096,8 +1096,8 @@ elif page == "🔧 Stock Adjustment":
             st.info("No past adjustments yet.")
         else:
             past_adj_refs = sorted(adj_log["REF_NUMBER"].unique().tolist(), reverse=True)
-            sel_adj_ref = st.selectbox("Select Adjustment Reference", past_adj_refs, key="past_adj_ref")
-            if sel_adj_ref:
+            sel_adj_ref = st.selectbox("Select Adjustment Reference", ["— Select an Adjustment —"] + past_adj_refs, key="past_adj_ref")
+            if sel_adj_ref and sel_adj_ref != "— Select an Adjustment —":
                 ref_rows = adj_log[adj_log["REF_NUMBER"] == sel_adj_ref]
                 first = ref_rows.iloc[0]
                 st.markdown(f'<div class="info-box">🔧 <strong>{sel_adj_ref}</strong> &nbsp;|&nbsp; 📅 {first.get("DATE","")} &nbsp;|&nbsp; 👤 {first.get("STAFF","")} &nbsp;|&nbsp; {len(ref_rows)} item(s)</div>', unsafe_allow_html=True)
