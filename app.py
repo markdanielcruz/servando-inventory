@@ -259,6 +259,7 @@ def build_doc_xlsx(doc_type, ref, date_str, staff_str, meta3_label, meta3_val, r
     f8g   = Font(name="Arial", size=8,  color="888888")
     f12g  = Font(bold=True, name="Arial", size=12, color="888888")
     f12b  = Font(bold=True, name="Arial", size=12)
+    f10b  = Font(bold=True, name="Arial", size=10)
     f9w   = Font(bold=True, name="Arial", size=9,  color="FFFFFF")
     f11   = Font(name="Arial", size=11)
     f11b  = Font(bold=True, name="Arial", size=11)
@@ -287,21 +288,21 @@ def build_doc_xlsx(doc_type, ref, date_str, staff_str, meta3_label, meta3_val, r
     try:
         logo_buf = BytesIO(base64.b64decode(logo_b64_str))
         xl_logo = XLImage(logo_buf)
-        xl_logo.width = 220
-        xl_logo.height = 49
+        xl_logo.width = 150
+        xl_logo.height = 34
         xl_logo.anchor = "D1"
         ws.add_image(xl_logo)
     except Exception:
         pass
 
     # ── row 1: title ──
-    ws.merge_cells("A1:E1")
+    ws.merge_cells("A1:C1")
     ws["A1"] = doc_type
     ws["A1"].font = f14b
     ws["A1"].alignment = vctr
 
     # ── row 2: reference ──
-    ws.merge_cells("A2:E2")
+    ws.merge_cells("A2:C2")
     ws["A2"] = f"Reference: {ref}"
     ws["A2"].font = f8g
 
@@ -312,7 +313,8 @@ def build_doc_xlsx(doc_type, ref, date_str, staff_str, meta3_label, meta3_val, r
     ws["E4"] = meta3_label;  ws["E4"].font = f12g
     ws["B5"] = staff_str;    ws["B5"].font = f12b
     ws["C5"] = date_str;     ws["C5"].font = f12b
-    ws["E5"] = meta3_val;    ws["E5"].font = f12b
+    ws["E5"] = meta3_val;    ws["E5"].font = f10b
+    ws["E5"].alignment = Alignment(shrink_to_fit=True)
 
     # ── row 7: table header ──
     for ci, (hdr, al) in enumerate([
