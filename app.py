@@ -169,7 +169,7 @@ LOG_HEADERS    = ["TIMESTAMP", "DATE", "MONTH", "ITEM", "STAFF", "TXN_TYPE", "RE
                   "ADD_IN", "OVER", "RESTO", "KITCHEN_BANQUET", "CAFE", "BAR", "OTHERS", "SPOILAGE", "NOTES",
                   "KITCHEN_ALACARTE", "DAMAGED_OUT"]
 
-DEPARTMENTS    = ["Resto", "Café", "Bar", "Kitchen Ala Carte", "Kitchen Banquet", "Others"]
+DEPARTMENTS    = ["Resto", "Café", "Bar", "Kitchen Ala Carte", "Kitchen Banquet"]
 DEPT_COL_MAP   = {"Resto": "RESTO", "Kitchen Banquet": "KITCHEN_BANQUET", "Café": "CAFE",
                   "Bar": "BAR", "Kitchen Ala Carte": "KITCHEN_ALACARTE", "Others": "OTHERS"}
 DEPT_LOG_INDEX = {"Resto": 9, "Kitchen Banquet": 10, "Café": 11, "Bar": 12, "Kitchen Ala Carte": 16}
@@ -1456,7 +1456,7 @@ elif page == "⬇️ Export to Excel":
                       "WORTH OF CAFÉ","WORTH OF BAR","WORTH OF KITCHEN ALA CARTE","WORTH OF KITCHEN BANQUET",
                       "WORTH OF RESTO","WORTH OF OTHERS","WORTH OF SPOILAGE","WORTH OF ENDING"]
         MAIN_NUM_COLS  = [2,3,6,7,8,9,10,11,12,13,14,15,16,17]   # all numeric main columns (incl. Unit Cost)
-        MAIN_SUM_COLS  = [2,6,7,8,9,10,11,12,13,14,15,16,17]     # numeric main columns to total (excl. Unit Cost)
+        MAIN_SUM_COLS  = [6,7,8,9,10,11,12,13,14,15,16,17]       # numeric main columns to total (excl. Unit Cost, Beginning Stocks)
         WORTH_START_COL = 19  # main block (17 cols) + 1 blank spacer column (18)
 
         def col_letter(n): return get_column_letter(n)
