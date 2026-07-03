@@ -18,135 +18,156 @@ st.set_page_config(
 # ── CSS ────────────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@300;400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Inter:wght@400;500;600;700&display=swap');
 
 *, *::before, *::after { box-sizing: border-box; }
 html, body, [class*="css"] {
     font-family: 'Inter', sans-serif;
-    background-color: #0A1208;
-    color: #D4D0C8;
+    background-color: #0F1A0D;
+    color: #E4E1D8;
+    font-size: 16px;
 }
 .stApp {
-    background-color: #0A1208;
+    background-color: #0F1A0D;
     background-attachment: fixed;
     background-size: cover;
 }
 [data-testid="stSidebar"] {
-    background-color: rgba(8,14,8,0.95) !important;
-    border-right: 1px solid #2A3828;
-    backdrop-filter: blur(8px);
+    background-color: #0B140A !important;
+    border-right: 1px solid #26361F;
 }
-[data-testid="stSidebar"] * { color: #D4D0C8 !important; }
+[data-testid="stSidebar"] * { color: #E4E1D8 !important; }
+
+/* Page header */
 .main-header {
-    background: linear-gradient(135deg, rgba(26,46,26,0.85) 0%, rgba(21,37,21,0.85) 100%);
-    border: 1px solid #2A3828;
-    border-radius: 12px;
-    padding: 20px 28px;
-    margin-bottom: 20px;
-    backdrop-filter: blur(6px);
+    background: #162412;
+    border: 1px solid #2A3E23;
+    border-radius: 14px;
+    padding: 22px 28px;
+    margin-bottom: 22px;
 }
 .main-header h1 {
     font-family: 'Cormorant Garamond', serif;
-    font-size: 1.7rem;
-    color: #8CAF7A;
-    margin: 0 0 2px 0;
-    font-weight: 600;
+    font-size: 2rem;
+    color: #9FC98A;
+    margin: 0 0 4px 0;
+    font-weight: 700;
 }
-.main-header p { font-size: 0.7rem; letter-spacing: 2.5px; text-transform: uppercase; color: #4A6B3E; margin: 0; }
+.main-header p { font-size: 0.95rem; color: #7FA06E; margin: 0; }
+
+/* Cards / sections */
 .card {
-    background: #111E11;
-    border: 1px solid #1E2E1C;
-    border-radius: 12px;
-    padding: 1.25rem 1.5rem;
-    margin-bottom: 1rem;
+    background: #142010;
+    border: 1px solid #263A1F;
+    border-radius: 14px;
+    padding: 1.4rem 1.6rem;
+    margin-bottom: 1.1rem;
 }
 .section-title {
-    font-size: 0.62rem;
-    font-weight: 600;
-    letter-spacing: 3px;
-    text-transform: uppercase;
-    color: #5A7A52;
-    margin-bottom: 0.75rem;
-    padding-bottom: 6px;
-    border-bottom: 1px solid #1E2E1C;
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #9FC98A;
+    margin-bottom: 0.9rem;
+    padding-bottom: 8px;
+    border-bottom: 2px solid #26361F;
     display: block;
 }
+
+/* Buttons */
 .stButton > button {
-    background-color: #2A3E28 !important;
-    color: #A8C896 !important;
-    border: 1px solid #3A5238 !important;
-    border-radius: 8px !important;
+    background-color: #35502C !important;
+    color: #EAF3E3 !important;
+    border: 1px solid #4A6B3E !important;
+    border-radius: 10px !important;
     font-weight: 600 !important;
-    font-size: 0.82rem !important;
-    transition: all 0.2s !important;
+    font-size: 0.95rem !important;
+    padding: 0.55rem 1rem !important;
+    transition: all 0.15s !important;
 }
 .stButton > button:hover {
-    background-color: #3A5238 !important;
-    border-color: #5A7A52 !important;
-    color: #C8DCC0 !important;
+    background-color: #46693A !important;
+    border-color: #6B9A5A !important;
+    color: #FFFFFF !important;
 }
+.stButton > button[kind="primary"] {
+    background-color: #4C7A3D !important;
+    border-color: #6B9A5A !important;
+}
+
+/* Inputs */
 .stTextInput > div > div > input,
 .stNumberInput > div > div > input,
 .stTextArea > div > textarea,
-.stSelectbox > div > div {
-    background-color: #111E11 !important;
-    border: 1px solid #2A3828 !important;
-    border-radius: 8px !important;
-    color: #D4D0C8 !important;
-    font-size: 0.88rem !important;
+.stSelectbox > div > div,
+.stDateInput > div > div > input {
+    background-color: #182617 !important;
+    border: 1px solid #33482B !important;
+    border-radius: 10px !important;
+    color: #E4E1D8 !important;
+    font-size: 1rem !important;
 }
-label { color: #8A9E84 !important; font-size: 0.78rem !important; font-weight: 500 !important; }
+label { color: #A9C29B !important; font-size: 0.92rem !important; font-weight: 600 !important; }
+
 .log-entry {
-    background: #0E1810;
-    border-left: 3px solid #3A5238;
-    padding: 0.6rem 1rem;
-    border-radius: 0 8px 8px 0;
-    margin-bottom: 0.4rem;
-    font-size: 0.88rem;
-    color: #D4D0C8;
+    background: #121E10;
+    border-left: 4px solid #4A6B3E;
+    padding: 0.75rem 1.1rem;
+    border-radius: 0 10px 10px 0;
+    margin-bottom: 0.5rem;
+    font-size: 0.95rem;
+    color: #E4E1D8;
 }
 .po-item-row {
-    background: #0E1810;
-    border: 1px solid #2A3828;
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    margin-bottom: 0.4rem;
-    color: #D4D0C8;
+    background: #121E10;
+    border: 1px solid #26361F;
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    margin-bottom: 0.5rem;
+    color: #E4E1D8;
+    font-size: 0.95rem;
 }
 .info-box {
-    background: #111E11;
-    border: 1px solid #2A3828;
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    color: #8CAF7A;
-    margin: 0.4rem 0;
-    font-size: 0.88rem;
+    background: #16241A;
+    border: 1px solid #33482B;
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    color: #9FC98A;
+    margin: 0.5rem 0;
+    font-size: 0.95rem;
 }
 .success-box {
-    background: #1A2E1A;
-    border: 1px solid #3A5238;
-    border-radius: 8px;
-    padding: 0.6rem 1rem;
-    color: #A8C896;
-    margin: 0.4rem 0;
+    background: #1E3419;
+    border: 1px solid #4A6B3E;
+    border-radius: 10px;
+    padding: 0.75rem 1.1rem;
+    color: #C4E0B4;
+    margin: 0.5rem 0;
 }
+
+/* Metrics */
 [data-testid="metric-container"] {
-    background: #111E11 !important;
-    border: 1px solid #1E2E1C !important;
-    border-radius: 10px !important;
-    padding: 12px 14px !important;
+    background: #142010 !important;
+    border: 1px solid #263A1F !important;
+    border-radius: 12px !important;
+    padding: 14px 16px !important;
 }
 [data-testid="metric-container"] label {
-    font-size: 0.6rem !important; letter-spacing: 2px !important;
-    text-transform: uppercase !important; color: #5A7A52 !important;
+    font-size: 0.8rem !important; text-transform: none !important; color: #7FA06E !important; font-weight: 600 !important;
 }
 [data-testid="stMetricValue"] {
     font-family: 'Cormorant Garamond', serif !important;
-    font-size: 1.5rem !important; font-weight: 600 !important; color: #A8C896 !important;
+    font-size: 1.8rem !important; font-weight: 700 !important; color: #C4E0B4 !important;
 }
-[data-testid="stDataFrame"] { border: 1px solid #1E2E1C !important; border-radius: 10px !important; }
-hr { border-color: #1E2E1C !important; }
-h3 { font-family: 'Cormorant Garamond', serif !important; color: #A8C896 !important; }
+
+[data-testid="stDataFrame"] { border: 1px solid #263A1F !important; border-radius: 12px !important; }
+hr { border-color: #263A1F !important; }
+h3 { font-family: 'Cormorant Garamond', serif !important; color: #C4E0B4 !important; }
+
+/* Sidebar nav radio: bigger, clearer rows */
+[data-testid="stSidebar"] .stRadio label {
+    font-size: 1.02rem !important;
+    padding: 6px 4px !important;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -380,15 +401,14 @@ def build_doc_xlsx(doc_type, ref, date_str, staff_str, meta3_label, meta3_val, r
 
 # ── Sidebar ────────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("""
-    <div style='background:linear-gradient(175deg,#1A2E1A 0%,#0E1C0E 60%,#080F08 100%);
-                padding:24px 20px 18px;border-bottom:1px solid #2A3828;text-align:center;'>
-        <div style='font-family:Cormorant Garamond,serif;font-size:1.5rem;font-weight:700;color:#8CAF7A;letter-spacing:2px;'>SERVANDO</div>
-        <div style='font-size:0.56rem;letter-spacing:3px;text-transform:uppercase;color:#4A6B3E;margin-top:5px;'>Main Warehouse Inventory</div>
+    st.markdown(f"""
+    <div style='background:#0B140A; padding:22px 16px 16px;border-bottom:1px solid #26361F;text-align:center;'>
+        <img src="data:image/jpeg;base64,{LOGO_B64}" style="max-width:100%; height:auto; margin-bottom:8px;" />
+        <div style='font-size:0.8rem;color:#7FA06E;margin-top:2px;'>Main Warehouse Inventory</div>
     </div>
-    <div style='font-size:0.56rem;font-weight:600;letter-spacing:3px;text-transform:uppercase;
-                color:#4A6B3E;padding:14px 12px 5px;border-bottom:1px solid #1E2E1C;margin-bottom:6px;'>
-        Navigation
+    <div style='font-size:0.85rem;font-weight:700;
+                color:#7FA06E;padding:16px 12px 6px;border-bottom:2px solid #26361F;margin-bottom:8px;'>
+        Menu
     </div>
     """, unsafe_allow_html=True)
 
