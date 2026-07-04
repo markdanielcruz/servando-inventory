@@ -1,6 +1,3 @@
-# app.py
-
-```python
 import streamlit as st
 import gspread
 from google.oauth2.service_account import Credentials
@@ -1774,5 +1771,3 @@ elif page == "⚙️ Setup":
         else:
             st.error("❌ Confirmation text doesn't match. Nothing was deleted.")
     st.markdown('</div>', unsafe_allow_html=True)
-
-```
